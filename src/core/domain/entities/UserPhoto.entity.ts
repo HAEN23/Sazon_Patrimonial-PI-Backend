@@ -30,6 +30,16 @@ export class UserPhoto {
     );
   }
 
+  static fromPrisma(prismaPhoto: any): UserPhoto {
+    return new UserPhoto(
+      prismaPhoto.id,
+      new FileUrl(prismaPhoto.photoUrl),
+      prismaPhoto.clientId,
+      prismaPhoto.restaurantId,
+      new Date(prismaPhoto.uploadedAt)
+    );
+  }
+
   toJSON() {
     return {
       id: this.id,

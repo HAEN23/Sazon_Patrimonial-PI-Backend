@@ -11,6 +11,13 @@ export class Administrator {
     return new Administrator(userId, new Date());
   }
 
+  static fromPrisma(prismaAdmin: any): Administrator {
+    return new Administrator(
+      prismaAdmin.userId,
+      new Date(prismaAdmin.createdAt)
+    );
+  }
+
   toJSON() {
     return {
       userId: this.userId,

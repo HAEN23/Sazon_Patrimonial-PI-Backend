@@ -63,6 +63,24 @@ export class Restaurant {
     );
   }
 
+  static fromPrisma(prismaRestaurant: any): Restaurant {
+    return new Restaurant(
+      prismaRestaurant.id,
+      prismaRestaurant.name,
+      prismaRestaurant.schedule,
+      new Phone(prismaRestaurant.phone),
+      prismaRestaurant.tags || [],
+      prismaRestaurant.address,
+      prismaRestaurant.ownerId,
+      prismaRestaurant.applicationId,
+      prismaRestaurant.facebook ? new Url(prismaRestaurant.facebook) : undefined,
+      prismaRestaurant.instagram ? new Url(prismaRestaurant.instagram) : undefined,
+      prismaRestaurant.likesCount || 0,
+      new Date(prismaRestaurant.createdAt),
+      new Date(prismaRestaurant.updatedAt)
+    );
+  }
+
   incrementLikes(): void {
     this.likesCount++;
   }

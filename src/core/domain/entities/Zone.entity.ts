@@ -18,6 +18,16 @@ export class Zone {
     return new Zone(0, data.name.trim(), data.ownerId, new Date(), new Date());
   }
 
+  static fromPrisma(prismaZone: any): Zone {
+    return new Zone(
+      prismaZone.id,
+      prismaZone.name,
+      prismaZone.ownerId,
+      new Date(prismaZone.createdAt),
+      new Date(prismaZone.updatedAt)
+    );
+  }
+
   updateName(newName: string): void {
     if (!newName || newName.trim().length < 3) {
       throw new Error('El nombre de la zona debe tener al menos 3 caracteres');

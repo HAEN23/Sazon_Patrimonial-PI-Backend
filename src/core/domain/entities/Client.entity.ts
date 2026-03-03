@@ -22,6 +22,15 @@ export class Client {
     return new Client(userId, phone, new Date(), new Date());
   }
 
+  static fromPrisma(prismaClient: any): Client {
+    return new Client(
+      prismaClient.userId,
+      prismaClient.phone,
+      new Date(prismaClient.createdAt),
+      new Date(prismaClient.updatedAt)
+    );
+  }
+
   updatePhone(newPhone?: string): void {
     if (newPhone) {
       const cleaned = newPhone.replace(/\s/g, '');

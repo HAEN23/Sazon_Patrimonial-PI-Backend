@@ -36,6 +36,18 @@ export class Download {
     );
   }
 
+  static fromPrisma(prismaDownload: any): Download {
+    return new Download(
+      prismaDownload.id,
+      prismaDownload.downloadCount,
+      prismaDownload.origin,
+      prismaDownload.opinion,
+      prismaDownload.ownerId,
+      new Date(prismaDownload.createdAt),
+      new Date(prismaDownload.updatedAt)
+    );
+  }
+
   incrementCount(): void {
     this.downloadCount++;
     this.updatedAt = new Date();

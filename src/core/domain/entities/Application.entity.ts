@@ -47,6 +47,20 @@ export class Application {
     );
   }
 
+  static fromPrisma(prismaApplication: any): Application {
+    return new Application(
+      prismaApplication.id,
+      prismaApplication.proposedRestaurantName,
+      prismaApplication.ownerName,
+      new Email(prismaApplication.email),
+      prismaApplication.schedule,
+      prismaApplication.status as ApplicationStatus,
+      prismaApplication.ownerId,
+      new Date(prismaApplication.createdAt),
+      new Date(prismaApplication.updatedAt)
+    );
+  }
+
   approve(): void {
     if (this.status === ApplicationStatus.APPROVED) {
       throw new Error('La solicitud ya está aprobada');

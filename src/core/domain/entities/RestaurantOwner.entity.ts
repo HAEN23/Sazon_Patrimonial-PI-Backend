@@ -11,6 +11,13 @@ export class RestaurantOwner {
     return new RestaurantOwner(userId, new Date());
   }
 
+  static fromPrisma(prismaOwner: any): RestaurantOwner {
+    return new RestaurantOwner(
+      prismaOwner.userId,
+      new Date(prismaOwner.createdAt)
+    );
+  }
+
   toJSON() {
     return {
       userId: this.userId,

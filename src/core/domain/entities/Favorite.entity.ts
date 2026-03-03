@@ -17,6 +17,15 @@ export class Favorite {
     return new Favorite(0, clientId, restaurantId, new Date());
   }
 
+  static fromPrisma(prismaFavorite: any): Favorite {
+    return new Favorite(
+      prismaFavorite.id,
+      prismaFavorite.clientId,
+      prismaFavorite.restaurantId,
+      new Date(prismaFavorite.createdAt)
+    );
+  }
+
   toJSON() {
     return {
       id: this.id,

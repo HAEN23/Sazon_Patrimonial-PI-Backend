@@ -35,6 +35,19 @@ export class Menu {
     );
   }
 
+  static fromPrisma(prismaMenu: any): Menu {
+    return new Menu(
+      prismaMenu.id,
+      new FileUrl(prismaMenu.fileUrl),
+      new FileUrl(prismaMenu.menuUrl),
+      prismaMenu.status as MenuStatus,
+      prismaMenu.restaurantId,
+      prismaMenu.downloadCount || 0,
+      new Date(prismaMenu.createdAt),
+      new Date(prismaMenu.updatedAt)
+    );
+  }
+
   activate(): void {
     this.status = MenuStatus.ACTIVE;
     this.updatedAt = new Date();

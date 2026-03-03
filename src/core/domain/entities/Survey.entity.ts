@@ -40,6 +40,20 @@ export class Survey {
     );
   }
 
+  static fromPrisma(prismaSurvey: any): Survey {
+    return new Survey(
+      prismaSurvey.id,
+      prismaSurvey.clientId,
+      prismaSurvey.restaurantId,
+      prismaSurvey.question1,
+      prismaSurvey.question2,
+      prismaSurvey.question3,
+      prismaSurvey.question4,
+      prismaSurvey.question5,
+      new Date(prismaSurvey.createdAt)
+    );
+  }
+
   isComplete(): boolean {
     return !!(
       this.question1 &&

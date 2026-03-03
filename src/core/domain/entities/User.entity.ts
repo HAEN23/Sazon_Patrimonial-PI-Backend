@@ -30,6 +30,18 @@ export class User {
     );
   }
 
+  static fromPrisma(prismaUser: any): User {
+    return new User(
+      prismaUser.id,
+      prismaUser.name,
+      new Email(prismaUser.email),
+      new Password(prismaUser.password, true), // true = already hashed
+      prismaUser.type as UserType,
+      new Date(prismaUser.createdAt),
+      new Date(prismaUser.updatedAt)
+    );
+  }
+
   updateName(newName: string): void {
     if (!newName || newName.trim().length < 3) {
       throw new Error('El nombre debe tener al menos 3 caracteres');
