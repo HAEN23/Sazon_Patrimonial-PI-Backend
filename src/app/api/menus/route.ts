@@ -7,6 +7,7 @@ import { CreateMenuUseCase } from '@/core/application/use-cases/menus/CreateMenu
 import { GetMenusByOwnerUseCase } from '@/core/application/use-cases/menus/GetMenusByOwner.usecase';
 import { PrismaMenuRepository } from '@/core/infrastructure/database/repositories/PrismaMenuRepository';
 import { PrismaRestaurantRepository } from '@/core/infrastructure/database/repositories/PrismaRestaurantRepository';
+import { UserType } from '@/core/domain/enums/UserType.enum';
 
 /**
  * GET /api/menus?ownerId=123
@@ -49,7 +50,7 @@ export async function POST(request: NextRequest) {
     const result = await useCase.execute({
       ...body,
       requesterId: user.userId,
-      requesterType: user.type,
+      requesterType: user.type as UserType,
     });
 
     return NextResponse.json({

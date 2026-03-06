@@ -3,7 +3,7 @@ import { withErrorHandler } from '@/core/infrastructure/http/middleware/error.mi
 import { clientAuthMiddleware } from '@/core/infrastructure/http/middleware/client-auth.middleware';
 import { validateBody } from '@/core/infrastructure/http/middleware/validation.middleware';
 import { updateClientSchema } from '@/core/infrastructure/http/validators/client.validator';
-import { UpdateClientUseCase } from '@/core/application/use-cases/clients/UpdateClient.usecase';
+import { UpdateClientUseCase, UpdateClientDto } from '@/core/application/use-cases/clients/UpdateClient.usecase';
 import { PrismaClientRepository } from '@/core/infrastructure/database/repositories/PrismaClientRepository';
 import { PrismaUserRepository } from '@/core/infrastructure/database/repositories/PrismaUserRepository';
 
@@ -27,15 +27,15 @@ export async function PUT(
       );
     }
 
-    const body = await validateBody(request, updateClientSchema);
+    const body = await validateBody<Omit<UpdateClientDto, 'userId'>>(request, updateClientSchema);
 
     const clientRepository = new PrismaClientRepository();
     const userRepository = new PrismaUserRepository();
 
-    const useCase = new UpdateClientUseCase(clientRepository, userRepository);
+    const useCase = new UpdateClientUseCase(userRepository, clientRepository);
     
     await useCase.execute({
-      clientId,
+      userId: clientId,
       ...body,
     });
 

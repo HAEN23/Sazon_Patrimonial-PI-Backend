@@ -5,6 +5,7 @@ import { UpdateZoneUseCase } from '@/core/application/use-cases/zones/UpdateZone
 import { DeleteZoneUseCase } from '@/core/application/use-cases/zones/DeleteZone.usecase';
 import { PrismaZoneRepository } from '@/core/infrastructure/database/repositories/PrismaZoneRepository';
 import { PrismaRestaurantRepository } from '@/core/infrastructure/database/repositories/PrismaRestaurantRepository';
+import { UserType } from '@/core/domain/enums/UserType.enum';
 
 /**
  * PUT /api/zones/:id
@@ -25,7 +26,7 @@ export async function PUT(
     await useCase.execute({
       zoneId,
       requesterId: user.userId,
-      requesterType: user.type,
+      requesterType: user.type as UserType,
       name: body.name,
     });
 
@@ -56,7 +57,7 @@ export async function DELETE(
     await useCase.execute({
       zoneId,
       requesterId: user.userId,
-      requesterType: user.type,
+      requesterType: user.type as UserType,
     });
 
     return NextResponse.json({

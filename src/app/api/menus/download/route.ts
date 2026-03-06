@@ -7,6 +7,10 @@ import { DownloadMenuUseCase } from '@/core/application/use-cases/menus/Download
 import { PrismaMenuRepository } from '@/core/infrastructure/database/repositories/PrismaMenuRepository';
 import { PrismaFavoriteRepository } from '@/core/infrastructure/database/repositories/PrismaFavoriteRepository';
 
+interface DownloadMenuDto {
+  restaurantId: number;
+}
+
 /**
  * POST /api/menus/download
  * Descargar menú (requiere like)
@@ -14,7 +18,7 @@ import { PrismaFavoriteRepository } from '@/core/infrastructure/database/reposit
 export async function POST(request: NextRequest) {
   return withErrorHandler(async () => {
     const client = await clientAuthMiddleware(request);
-    const body = await validateBody(request, downloadMenuSchema);
+    const body = await validateBody<DownloadMenuDto>(request, downloadMenuSchema);
 
     const menuRepository = new PrismaMenuRepository();
     const favoriteRepository = new PrismaFavoriteRepository();

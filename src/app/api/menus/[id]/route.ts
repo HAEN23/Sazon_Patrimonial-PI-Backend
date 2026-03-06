@@ -6,6 +6,7 @@ import { DeleteMenuUseCase } from '@/core/application/use-cases/menus/DeleteMenu
 import { PrismaMenuRepository } from '@/core/infrastructure/database/repositories/PrismaMenuRepository';
 import { PrismaRestaurantRepository } from '@/core/infrastructure/database/repositories/PrismaRestaurantRepository';
 import { CloudinaryStorage } from '@/core/infrastructure/storage/CloudinaryStorage';
+import { UserType } from '@/core/domain/enums/UserType.enum';
 
 /**
  * PUT /api/menus/:id
@@ -28,7 +29,7 @@ export async function PUT(
     await useCase.execute({
       menuId,
       requesterId: user.userId,
-      requesterType: user.type,
+      requesterType: user.type as UserType,
       ...body,
     });
 
@@ -64,7 +65,7 @@ export async function DELETE(
     await useCase.execute({
       menuId,
       requesterId: user.userId,
-      requesterType: user.type,
+      requesterType: user.type as UserType,
     });
 
     return NextResponse.json({

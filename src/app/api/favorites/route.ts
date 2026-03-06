@@ -7,10 +7,14 @@ import { ToggleFavoriteUseCase } from '@/core/application/use-cases/favorites/To
 import { PrismaFavoriteRepository } from '@/core/infrastructure/database/repositories/PrismaFavoriteRepository';
 import { PrismaRestaurantRepository } from '@/core/infrastructure/database/repositories/PrismaRestaurantRepository';
 
+interface ToggleFavoriteDto {
+  restaurantId: number;
+}
+
 export async function POST(request: NextRequest) {
   return withErrorHandler(async () => {
     const client = await clientAuthMiddleware(request);
-    const body = await validateBody(request, toggleFavoriteSchema);
+    const body = await validateBody<ToggleFavoriteDto>(request, toggleFavoriteSchema);
 
     const favoriteRepository = new PrismaFavoriteRepository();
     const restaurantRepository = new PrismaRestaurantRepository();

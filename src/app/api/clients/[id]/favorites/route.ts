@@ -37,7 +37,7 @@ export async function GET(
 
     return NextResponse.json({
       success: true,
-      data: result.restaurants,
+      data: result.favorites,
       total: result.total,
       message: result.total === 0 ? 'No tienes restaurantes favoritos' : undefined,
     });

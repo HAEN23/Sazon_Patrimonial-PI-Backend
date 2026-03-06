@@ -28,7 +28,7 @@ export async function GET(
     const clientRepository = new PrismaClientRepository();
     const userRepository = new PrismaUserRepository();
 
-    const useCase = new GetClientUseCase(clientRepository, userRepository);
+    const useCase = new GetClientUseCase(userRepository, clientRepository);
     const result = await useCase.execute(clientId);
 
     return NextResponse.json({

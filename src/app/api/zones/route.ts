@@ -7,6 +7,10 @@ import { GetAllZonesUseCase } from '@/core/application/use-cases/zones/GetAllZon
 import { CreateZoneUseCase } from '@/core/application/use-cases/zones/CreateZone.usecase';
 import { PrismaZoneRepository } from '@/core/infrastructure/database/repositories/PrismaZoneRepository';
 
+interface CreateZoneBodyDto {
+  name: string;
+}
+
 /**
  * GET /api/zones
  * Obtener todas las zonas
@@ -33,7 +37,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   return withErrorHandler(async () => {
     const user = await authMiddleware(request);
-    const body = await validateBody(request, createZoneSchema);
+    const body = await validateBody<CreateZoneBodyDto>(request, createZoneSchema);
 
     const zoneRepository = new PrismaZoneRepository();
     const useCase = new CreateZoneUseCase(zoneRepository);

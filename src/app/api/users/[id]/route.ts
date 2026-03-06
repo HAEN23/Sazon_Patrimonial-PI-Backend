@@ -5,6 +5,11 @@ import { GetUserUseCase } from '@/core/application/use-cases/users/GetUser.useca
 import { UpdateUserUseCase } from '@/core/application/use-cases/users/UpdateUser.usecase';
 import { DeleteUserUseCase } from '@/core/application/use-cases/users/DeleteUser.usecase';
 import { PrismaUserRepository } from '@/core/infrastructure/database/repositories/PrismaUserRepository';
+import { PrismaClientRepository } from '@/core/infrastructure/database/repositories/PrismaClientRepository';
+import { PrismaAdministratorRepository } from '@/core/infrastructure/database/repositories/PrismaAdministratorRepository';
+import { PrismaRestaurantOwnerRepository } from '@/core/infrastructure/database/repositories/PrismaRestaurantOwnerRepository';
+import { PrismaRestaurantRepository } from '@/core/infrastructure/database/repositories/PrismaRestaurantRepository';
+import { UserType } from '@/core/domain/enums/UserType.enum';
 
 /**
  * GET /api/users/:id
@@ -39,14 +44,20 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   return withErrorHandler(async () => {
-    await adminMiddleware(request);
+    const admin = await adminMiddleware(request);
     const userId = parseInt(params.id);
     const body = await request.json();
 
     const userRepository = new PrismaUserRepository();
-    const useCase = new UpdateUserUseCase(userRepository);
+    const clientRepository = new PrismaClientRepository();
+    const useCase = new UpdateUserUseCase(userRepository, clientRepository);
 
-    await useCase.execute(userId, body);
+    await useCase.execute({
+      userId,
+      requesterId: admin.userId,
+      requesterType: admin.type as UserType,
+      ...body,
+    });
 
     return NextResponse.json({
       success: true,
@@ -64,13 +75,28 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   return withErrorHandler(async () => {
-    await adminMiddleware(request);
+    const admin = await adminMiddleware(request);
     const userId = parseInt(params.id);
 
     const userRepository = new PrismaUserRepository();
-    const useCase = new DeleteUserUseCase(userRepository);
+    const administratorRepository = new PrismaAdministratorRepository();
+    const restaurantOwnerRepository = new PrismaRestaurantOwnerRepository();
+    const clientRepository = new PrismaClientRepository();
+    const restaurantRepository = new PrismaRestaurantRepository();
 
-    await useCase.execute(userId);
+    const useCase = new DeleteUserUseCase(
+      userRepository,
+      administratorRepository,
+      restaurantOwnerRepository,
+      clientRepository,
+      restaurantRepository
+    );
+
+    await useCase.execute({
+      userId,
+      requesterId: admin.userId,
+      requesterType: admin.type as UserType,
+    });
 
     return NextResponse.json({
       success: true,

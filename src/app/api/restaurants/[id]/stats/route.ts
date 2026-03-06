@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withErrorHandler } from '@/core/infrastructure/http/middleware/error.middleware';
-import { GetRestaurantStatsUseCase } from '@/core/application/use-cases/restaurants/GetRestaurantStats.usecase';
+import { GetRestaurantStatsUseCase } from '@/core/application/use-cases/statistics/GetRestaurantStats.usecase';
 import { PrismaRestaurantRepository } from '@/core/infrastructure/database/repositories/PrismaRestaurantRepository';
 import { PrismaFavoriteRepository } from '@/core/infrastructure/database/repositories/PrismaFavoriteRepository';
 import { PrismaUserPhotoRepository } from '@/core/infrastructure/database/repositories/PrismaUserPhotoRepository';

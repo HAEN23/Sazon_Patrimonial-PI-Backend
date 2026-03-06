@@ -3,13 +3,14 @@ import { withErrorHandler } from '@/core/infrastructure/http/middleware/error.mi
 import { validateBody } from '@/core/infrastructure/http/middleware/validation.middleware';
 import { clientRegisterSchema } from '@/core/infrastructure/http/validators/client.validator';
 import { ClientRegisterUseCase } from '@/core/application/use-cases/auth/ClientRegister.usecase';
+import { ClientRegisterDto } from '@/core/application/use-cases/auth/ClientRegister.usecase';
 import { PrismaUserRepository } from '@/core/infrastructure/database/repositories/PrismaUserRepository';
 import { PrismaClientRepository } from '@/core/infrastructure/database/repositories/PrismaClientRepository';
 import { BcryptPasswordHasher } from '@/core/infrastructure/auth/BcryptPasswordHasher';
 
 export async function POST(request: NextRequest) {
   return withErrorHandler(async () => {
-    const body = await validateBody(request, clientRegisterSchema);
+    const body = await validateBody<ClientRegisterDto>(request, clientRegisterSchema);
 
     const userRepository = new PrismaUserRepository();
     const clientRepository = new PrismaClientRepository();

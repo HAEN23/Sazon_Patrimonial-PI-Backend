@@ -6,6 +6,9 @@ import { createUserSchema } from '@/core/infrastructure/http/validators/user.val
 import { GetAllUsersUseCase } from '@/core/application/use-cases/users/GetAllUsers.usecase';
 import { CreateUserUseCase } from '@/core/application/use-cases/users/CreateUser.usecase';
 import { PrismaUserRepository } from '@/core/infrastructure/database/repositories/PrismaUserRepository';
+import { PrismaAdministratorRepository } from '@/core/infrastructure/database/repositories/PrismaAdministratorRepository';
+import { PrismaRestaurantOwnerRepository } from '@/core/infrastructure/database/repositories/PrismaRestaurantOwnerRepository';
+import { PrismaClientRepository } from '@/core/infrastructure/database/repositories/PrismaClientRepository';
 import { BcryptPasswordHasher } from '@/core/infrastructure/auth/BcryptPasswordHasher';
 
 /**
@@ -39,9 +42,18 @@ export async function POST(request: NextRequest) {
     const body = await validateBody(request, createUserSchema);
 
     const userRepository = new PrismaUserRepository();
+    const administratorRepository = new PrismaAdministratorRepository();
+    const restaurantOwnerRepository = new PrismaRestaurantOwnerRepository();
+    const clientRepository = new PrismaClientRepository();
     const passwordHasher = new BcryptPasswordHasher();
 
-    const useCase = new CreateUserUseCase(userRepository, passwordHasher);
+    const useCase = new CreateUserUseCase(
+      userRepository,
+      administratorRepository,
+      restaurantOwnerRepository,
+      clientRepository,
+      passwordHasher
+    );
     const result = await useCase.execute(body);
 
     return NextResponse.json({

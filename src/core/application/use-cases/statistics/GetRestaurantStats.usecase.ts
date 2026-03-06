@@ -2,29 +2,20 @@ import { IRestaurantRepository } from '@/core/domain/repositories/IRestaurantRep
 import { IFavoriteRepository } from '@/core/domain/repositories/IFavoriteRepository';
 import { IUserPhotoRepository } from '@/core/domain/repositories/IUserPhotoRepository';
 import { IMenuRepository } from '@/core/domain/repositories/IMenuRepository';
+import { NotFoundException } from '@/core/domain/exceptions/NotFoundException';
 
-export interface OwnerStatsResult {
-  restaurants: {
-    total: number;
-    list: Array<{
-      id: number;
-      name: string;
-      likes: number;
-      photos: number;
-      downloads: number;
-    }>;
-  };
-  totals: {
-    totalLikes: number;
-    totalPhotos: number;
-    totalDownloads: number;
-  };
+export interface RestaurantStatsResult {
+  restaurantId: number;
+  restaurantName: string;
+  likes: number;
+  photos: number;
+  downloads: number;
 }
 
 /**
- * Caso de uso: Obtener estadísticas de un restaurantero
+ * Caso de uso: Obtener estadísticas de un restaurante
  */
-export class GetOwnerStatsUseCase {
+export class GetRestaurantStatsUseCase {
   constructor(
     private readonly restaurantRepository: IRestaurantRepository,
     private readonly favoriteRepository: IFavoriteRepository,
@@ -32,44 +23,26 @@ export class GetOwnerStatsUseCase {
     private readonly menuRepository: IMenuRepository
   ) {}
 
-  async execute(ownerId: number): Promise<OwnerStatsResult> {
-    // Obtener restaurantes del propietario
-    const restaurants = await this.restaurantRepository.findByOwnerId(ownerId);
+  async execute(restaurantId: number): Promise<RestaurantStatsResult> {
+    // Verificar que el restaurante existe
+    const restaurant = await this.restaurantRepository.findById(restaurantId);
+    if (!restaurant) {
+      throw NotFoundException.restaurantNotFound(restaurantId);
+    }
 
-    // Obtener estadísticas de cada restaurante
-    const restaurantStats = await Promise.all(
-      restaurants.map(async (restaurant) => {
-        const [likes, photos, downloads] = await Promise.all([
-          this.favoriteRepository.countByRestaurant(restaurant.id),
-          this.userPhotoRepository.countByRestaurant(restaurant.id),
-          this.menuRepository.getTotalDownloadsByRestaurant(restaurant.id),
-        ]);
-
-        return {
-          id: restaurant.id,
-          name: restaurant.name,
-          likes,
-          photos,
-          downloads,
-        };
-      })
-    );
-
-    // Calcular totales
-    const totalLikes = restaurantStats.reduce((sum, r) => sum + r.likes, 0);
-    const totalPhotos = restaurantStats.reduce((sum, r) => sum + r.photos, 0);
-    const totalDownloads = restaurantStats.reduce((sum, r) => sum + r.downloads, 0);
+    // Obtener estadísticas del restaurante
+    const [likes, photos, downloads] = await Promise.all([
+      this.favoriteRepository.countByRestaurant(restaurantId),
+      this.userPhotoRepository.countByRestaurant(restaurantId),
+      this.menuRepository.getTotalDownloadsByRestaurant(restaurantId),
+    ]);
 
     return {
-      restaurants: {
-        total: restaurants.length,
-        list: restaurantStats,
-      },
-      totals: {
-        totalLikes,
-        totalPhotos,
-        totalDownloads,
-      },
+      restaurantId: restaurant.id,
+      restaurantName: restaurant.name,
+      likes,
+      photos,
+      downloads,
     };
   }
 }
