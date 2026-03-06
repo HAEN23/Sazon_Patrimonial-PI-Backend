@@ -64,6 +64,8 @@ model SolicitudRegistro {
   instagram                     String?   @db.VarChar(100)
   etiquetas                     String?   @db.VarChar(200)
   foto_portada                  String?   @db.VarChar(500)
+  foto_2                        String?   @db.VarChar(500)
+  foto_3                        String?   @db.VarChar(500)
   menu_pdf                      String?   @db.VarChar(500)
 
   // Relaciones

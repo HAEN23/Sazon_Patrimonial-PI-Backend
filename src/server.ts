@@ -85,6 +85,8 @@ app.get('/api/solicitudes/estado/Pendiente', authenticateToken, isAdmin, async (
         s.direccion,      -- Link de Maps
         s.telefono,
         s.foto_portada as img_url,
+        s.foto_2,
+        s.foto_3,
         s.menu_pdf as pdf_url,
         u.id_usuario
       FROM solicitud_registro s
@@ -138,7 +140,9 @@ app.put('/api/mi-restaurante', authenticateToken, async (req: Request, res: Resp
       facebook, 
       instagram, 
       etiquetas,
-      foto_portada, 
+      foto_portada,
+      foto_2, // <--- NUEVO
+      foto_3, // <--- NUEVO
       menu_pdf 
     } = req.body;
 
@@ -173,14 +177,17 @@ app.put('/api/mi-restaurante', authenticateToken, async (req: Request, res: Resp
           instagram = $6,
           etiquetas = $7,
           foto_portada = $8,
-          menu_pdf = $9,
+          foto_2 = $9,
+          foto_3 = $10,
+          menu_pdf = $11,
           estado = 'Pendiente',
           fecha = NOW()
-        WHERE id_usuario = $10
+        WHERE id_usuario = $12
       `;
       
       await pool.query(updateQuery, [
-        nombre, direccion, horario, telefono, facebook, instagram, etiquetas, foto_portada, menu_pdf, userId
+        nombre, direccion, horario, telefono, facebook, instagram, etiquetas, 
+        foto_portada, foto_2, foto_3, menu_pdf, userId
       ]);
 
     } else {
@@ -191,19 +198,21 @@ app.put('/api/mi-restaurante', authenticateToken, async (req: Request, res: Resp
         INSERT INTO solicitud_registro (
           id_usuario, 
           nombre_propuesto_restaurante, 
-          correo,                -- Campo obligatorio
-          nombre_propietario,    -- Campo obligatorio
+          correo,
+          nombre_propietario,
           direccion, 
           horario_atencion, 
           telefono, 
           facebook, 
           instagram, 
           etiquetas, 
-          foto_portada, 
+          foto_portada,
+          foto_2,
+          foto_3,
           menu_pdf, 
           fecha, 
           estado
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), 'Pendiente')
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW(), 'Pendiente')
       `;
 
       await pool.query(insertQuery, [
@@ -217,7 +226,9 @@ app.put('/api/mi-restaurante', authenticateToken, async (req: Request, res: Resp
         facebook, 
         instagram, 
         etiquetas, 
-        foto_portada, 
+        foto_portada,
+        foto_2,
+        foto_3,
         menu_pdf
       ]);
     }
