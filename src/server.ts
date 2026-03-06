@@ -3,6 +3,7 @@ import { Pool } from 'pg';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import jwt from 'jsonwebtoken';
+import bcrypt from 'bcrypt';
 
 dotenv.config();
 
@@ -53,28 +54,43 @@ const isAdmin = async (req: Request, res: Response, next: NextFunction) => {
 
 // ==================== RUTAS ====================
 
-// LOGIN (Ejemplo básico)
+// LOGIN (Soporta contraseñas encriptadas y en texto plano)
 app.post('/api/login', async (req: Request, res: Response) => {
   const { correo, contrasena } = req.body;
   try {
     const result = await pool.query('SELECT * FROM usuario WHERE correo = $1', [correo]);
     const user = result.rows[0];
 
-    if (user && user.contrasena === contrasena) { // Nota: En producción usa bcrypt!
+    // 1. Validar si el correo existe
+    if (!user) {
+      return res.status(401).json({ success: false, message: 'El correo no existe en la base de datos' });
+    }
+
+    // 2. Validar la contraseña (primero en texto plano, luego con bcrypt)
+    let isMatch = (user.contrasena === contrasena);
+    
+    if (!isMatch) {
+      // Si no coinciden exactamente, intentamos desencriptarla
+      isMatch = await bcrypt.compare(contrasena, user.contrasena);
+    }
+
+    if (isMatch) { 
+      // ¡ÉXITO!
       const token = jwt.sign({ id: user.id_usuario, role: user.id_rol }, JWT_SECRET, { expiresIn: '1h' });
       res.json({ success: true, token, user: { id: user.id_usuario, nombre: user.nombre, role: user.id_rol } });
     } else {
-      res.status(401).json({ success: false, message: 'Credenciales inválidas' });
+      // CONTRASEÑA MAL
+      res.status(401).json({ success: false, message: 'Contraseña incorrecta' });
     }
   } catch (error) {
-    res.status(500).json({ success: false, error: 'Error en login' });
+    console.error("Error en el login:", error);
+    res.status(500).json({ success: false, error: 'Error en el servidor durante el login' });
   }
 });
 
 // OBTENER SOLICITUDES PENDIENTES (Admin)
 app.get('/api/solicitudes/estado/Pendiente', authenticateToken, isAdmin, async (req: Request, res: Response) => {
   try {
-    // Obtenemos todos los campos nuevos de la solicitud
     const result = await pool.query(`
       SELECT 
         s.id_solicitud,
@@ -82,11 +98,11 @@ app.get('/api/solicitudes/estado/Pendiente', authenticateToken, isAdmin, async (
         s.nombre_propietario as propietario,
         s.correo,
         s.horario_atencion as horario,
-        s.direccion,      -- Link de Maps
+        s.direccion,
         s.telefono,
-        s.foto_portada as img_url,
-        s.foto_2,
-        s.foto_3,
+        s.foto_portada, -- Foto 1
+        s.foto_2,       -- Foto 2 (NUEVA)
+        s.foto_3,       -- Foto 3 (NUEVA)
         s.menu_pdf as pdf_url,
         u.id_usuario
       FROM solicitud_registro s
@@ -94,7 +110,6 @@ app.get('/api/solicitudes/estado/Pendiente', authenticateToken, isAdmin, async (
       WHERE s.estado = 'Pendiente'
       ORDER BY s.fecha DESC
     `);
-
     res.json({ success: true, data: result.rows });
   } catch (error) {
     console.error('❌ Error obteniendo solicitudes:', error);
