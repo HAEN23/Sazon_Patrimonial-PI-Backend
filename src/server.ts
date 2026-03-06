@@ -5,8 +5,16 @@ import dotenv from 'dotenv';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 import multer from 'multer';
+import { v2 as cloudinary } from 'cloudinary';
 
 dotenv.config();
+
+// Configuración de Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
+});
 
 const app = express();
 const port = process.env.PORT || 3003;
@@ -112,10 +120,10 @@ app.get('/api/solicitudes/estado/Pendiente', authenticateToken, isAdmin, async (
         s.horario_atencion as horario,
         s.direccion,
         s.telefono,
-        s.foto_portada, -- Foto 1
-        s.foto_2,       -- Foto 2 (NUEVA)
-        s.foto_3,       -- Foto 3 (NUEVA)
-        s.menu_pdf as pdf_url,
+        s.foto_portada,
+        s.foto_2,
+        s.foto_3,
+        s.menu_pdf as pdf_url, -- ✅ AQUÍ SE ENVÍA EL PDF
         u.id_usuario
       FROM solicitud_registro s
       LEFT JOIN usuario u ON s.id_usuario = u.id_usuario
@@ -125,11 +133,12 @@ app.get('/api/solicitudes/estado/Pendiente', authenticateToken, isAdmin, async (
     res.json({ success: true, data: result.rows });
   } catch (error) {
     console.error('❌ Error obteniendo solicitudes:', error);
-    res.status(500).json({ success: false, error: 'Error al obtener solicitudes' });
   }
 });
 
-// OBTENER MI RESTAURANTE (Restaurantero)
+// ============================================
+// 1️⃣ OBTENER MI RESTAURANTE (Restaurantero)
+// ============================================
 app.get('/api/mi-restaurante', authenticateToken, async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
@@ -153,11 +162,171 @@ app.get('/api/mi-restaurante', authenticateToken, async (req: Request, res: Resp
   }
 });
 
+// ============================================
+// 2️⃣ GUARDAR BORRADOR (Auto-guardado sin validación)
+// ============================================
+app.put('/api/mi-restaurante/draft', authenticateToken, uploadFields, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user.id;
+    const files = (req.files as { [fieldname: string]: Express.Multer.File[] }) || {};
+
+    console.log(`💾 Auto-guardando borrador para Usuario ID: ${userId}`);
+
+    const { 
+      nombre, 
+      direccion, 
+      horario, 
+      telefono, 
+      facebook, 
+      instagram, 
+      etiquetas 
+    } = req.body;
+
+    // 🔥 SUBIR A CLOUDINARY (si hay archivos nuevos)
+    const foto_portada_url = files['foto_portada'] 
+      ? await uploadToCloudinary(files['foto_portada'][0].buffer, 'restaurantes')
+      : req.body.foto_portada;
+
+    const foto_2_url = files['foto_2'] 
+      ? await uploadToCloudinary(files['foto_2'][0].buffer, 'restaurantes')
+      : req.body.foto_2;
+
+    const foto_3_url = files['foto_3'] 
+      ? await uploadToCloudinary(files['foto_3'][0].buffer, 'restaurantes')
+      : req.body.foto_3;
+
+    const menu_pdf_url = files['menu_pdf'] 
+      ? await uploadToCloudinary(files['menu_pdf'][0].buffer, 'menus', 'raw')
+      : req.body.menu_pdf;
+
+    // 1. Obtener datos del usuario
+    const userQuery = 'SELECT nombre, correo FROM usuario WHERE id_usuario = $1';
+    const userResult = await pool.query(userQuery, [userId]);
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Usuario no encontrado' });
+    }
+
+    const usuario = userResult.rows[0];
+    const nombrePropietario = usuario.nombre || 'Propietario Desconocido';
+    const correoPropietario = usuario.correo || 'sin_correo@ejemplo.com';
+
+    // 2. Verificar si ya existe una solicitud
+    const checkQuery = 'SELECT id_solicitud, estado FROM solicitud_registro WHERE id_usuario = $1';
+    const checkResult = await pool.query(checkQuery, [userId]);
+
+    if (checkResult.rows.length > 0) {
+      // ✅ ACTUALIZAR BORRADOR (mantiene el estado actual)
+      const estadoActual = checkResult.rows[0].estado;
+      
+      const updateQuery = `
+        UPDATE solicitud_registro SET
+          nombre_propuesto_restaurante = $1,
+          direccion = $2,
+          horario_atencion = $3,
+          telefono = $4,
+          facebook = $5,
+          instagram = $6,
+          etiquetas = $7,
+          foto_portada = $8,
+          foto_2 = $9,
+          foto_3 = $10,
+          menu_pdf = $11,
+          fecha = NOW()
+        WHERE id_usuario = $12
+      `;
+      
+      await pool.query(updateQuery, [
+        nombre, direccion, horario, telefono, facebook, instagram, etiquetas, 
+        foto_portada_url, foto_2_url, foto_3_url, menu_pdf_url, userId
+      ]);
+
+      console.log(`✅ Borrador actualizado (estado: ${estadoActual})`);
+    } else {
+      // ✅ CREAR BORRADOR INICIAL (estado: "Borrador")
+      const insertQuery = `
+        INSERT INTO solicitud_registro (
+          id_usuario, 
+          nombre_propuesto_restaurante, 
+          correo,
+          nombre_propietario,
+          direccion, 
+          horario_atencion, 
+          telefono, 
+          facebook, 
+          instagram, 
+          etiquetas, 
+          foto_portada,
+          foto_2,
+          foto_3,
+          menu_pdf, 
+          fecha, 
+          estado
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW(), 'Borrador')
+      `;
+
+      await pool.query(insertQuery, [
+        userId, 
+        nombre, 
+        correoPropietario, 
+        nombrePropietario,
+        direccion, 
+        horario, 
+        telefono, 
+        facebook, 
+        instagram, 
+        etiquetas, 
+        foto_portada_url,
+        foto_2_url,
+        foto_3_url,
+        menu_pdf_url
+      ]);
+
+      console.log(`✅ Borrador inicial creado`);
+    }
+
+    res.json({ success: true, message: 'Borrador guardado automáticamente' });
+
+  } catch (error: any) {
+    console.error('❌ Error guardando borrador:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================
+// 3️⃣ ENVIAR A REVISIÓN (Solo cuando el usuario hace clic en "Aplicar Cambios")
+// ============================================
+app.put('/api/mi-restaurante/submit', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user.id;
+
+    console.log(`📤 Enviando solicitud a revisión para Usuario ID: ${userId}`);
+
+    // Cambiar el estado a "Pendiente" para que el admin la vea
+    const updateQuery = `
+      UPDATE solicitud_registro 
+      SET estado = 'Pendiente', fecha = NOW()
+      WHERE id_usuario = $1
+    `;
+
+    await pool.query(updateQuery, [userId]);
+
+    res.json({ 
+      success: true, 
+      message: 'Solicitud enviada a revisión exitosamente' 
+    });
+
+  } catch (error: any) {
+    console.error('❌ Error enviando a revisión:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // GUARDAR/ACTUALIZAR RESTAURANTE (Restaurantero) - CON SUBIDA DE ARCHIVOS
 app.put('/api/mi-restaurante', authenticateToken, uploadFields, async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
-    const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+    const files = (req.files as { [fieldname: string]: Express.Multer.File[] }) || {};
 
     // --- AQUÍ DEBERÍAS SUBIR A CLOUDINARY ---
     // Por ahora, simularemos que devolvemos un link real tras la subida exitosa.
@@ -340,6 +509,30 @@ app.patch('/api/solicitudes/:id/rechazar', authenticateToken, isAdmin, async (re
     res.status(500).json({ success: false, error: 'Error al rechazar' });
   }
 });
+
+// ============================================
+// 🔥 FUNCIÓN AUXILIAR: Subir a Cloudinary
+// ============================================
+async function uploadToCloudinary(fileBuffer: Buffer, folder: string, resourceType: 'image' | 'raw' = 'image'): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        folder: `sazon-patrimonial/${folder}`,
+        resource_type: resourceType
+      },
+      (error, result) => {
+        if (error) {
+          console.error('Error subiendo a Cloudinary:', error);
+          reject(new Error('Error al subir archivo'));
+        } else {
+          resolve(result!.secure_url);
+        }
+      }
+    );
+    
+    uploadStream.end(fileBuffer);
+  });
+}
 
 app.listen(port, () => {
   console.log(`🚀 Servidor corriendo en http://localhost:${port}`);
