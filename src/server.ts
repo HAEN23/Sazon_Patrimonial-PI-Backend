@@ -4,6 +4,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
+import multer from 'multer';
 
 dotenv.config();
 
@@ -21,6 +22,17 @@ app.use(express.json());
 
 // Clave secreta para JWT
 const JWT_SECRET = process.env.JWT_SECRET || 'tu_secreto_super_seguro';
+
+// Configuración de Multer (almacenamiento temporal en memoria)
+const upload = multer({ storage: multer.memoryStorage() });
+
+// Middleware para capturar las 3 fotos y el PDF
+const uploadFields = upload.fields([
+  { name: 'foto_portada', maxCount: 1 },
+  { name: 'foto_2', maxCount: 1 },
+  { name: 'foto_3', maxCount: 1 },
+  { name: 'menu_pdf', maxCount: 1 }
+]);
 
 // Middleware de autenticación
 const authenticateToken = (req: Request, res: Response, next: NextFunction) => {
@@ -141,28 +153,34 @@ app.get('/api/mi-restaurante', authenticateToken, async (req: Request, res: Resp
   }
 });
 
-// GUARDAR/ACTUALIZAR RESTAURANTE (Restaurantero) - CORREGIDO
-app.put('/api/mi-restaurante', authenticateToken, async (req: Request, res: Response) => {
+// GUARDAR/ACTUALIZAR RESTAURANTE (Restaurantero) - CON SUBIDA DE ARCHIVOS
+app.put('/api/mi-restaurante', authenticateToken, uploadFields, async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
+    const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+
+    // --- AQUÍ DEBERÍAS SUBIR A CLOUDINARY ---
+    // Por ahora, simularemos que devolvemos un link real tras la subida exitosa.
+    // En el futuro usa tu 'CloudinaryStorage.ts' aquí.
+    
+    const foto_portada_url = files['foto_portada'] ? "link_de_cloudinary_1.jpg" : req.body.foto_portada;
+    const foto_2_url = files['foto_2'] ? "link_de_cloudinary_2.jpg" : req.body.foto_2;
+    const foto_3_url = files['foto_3'] ? "link_de_cloudinary_3.jpg" : req.body.foto_3;
+    const menu_pdf_url = files['menu_pdf'] ? "link_de_cloudinary_menu.pdf" : req.body.menu_pdf;
+
     console.log(`🔹 Guardando datos para Usuario ID: ${userId}`);
 
     const { 
       nombre, 
-      direccion, // Link de Maps
+      direccion,
       horario, 
       telefono, 
       facebook, 
       instagram, 
-      etiquetas,
-      foto_portada,
-      foto_2, // <--- NUEVO
-      foto_3, // <--- NUEVO
-      menu_pdf 
+      etiquetas
     } = req.body;
 
     // 1. Obtener datos OBLIGATORIOS del usuario (Nombre y Correo)
-    // Esto soluciona el error "null value in column 'correo'"
     const userQuery = 'SELECT nombre, correo FROM usuario WHERE id_usuario = $1';
     const userResult = await pool.query(userQuery, [userId]);
 
@@ -202,7 +220,7 @@ app.put('/api/mi-restaurante', authenticateToken, async (req: Request, res: Resp
       
       await pool.query(updateQuery, [
         nombre, direccion, horario, telefono, facebook, instagram, etiquetas, 
-        foto_portada, foto_2, foto_3, menu_pdf, userId
+        foto_portada_url, foto_2_url, foto_3_url, menu_pdf_url, userId
       ]);
 
     } else {
@@ -241,18 +259,18 @@ app.put('/api/mi-restaurante', authenticateToken, async (req: Request, res: Resp
         facebook, 
         instagram, 
         etiquetas, 
-        foto_portada,
-        foto_2,
-        foto_3,
-        menu_pdf
+        foto_portada_url,
+        foto_2_url,
+        foto_3_url,
+        menu_pdf_url
       ]);
     }
 
-    res.json({ success: true, message: 'Datos guardados correctamente' });
+    res.json({ success: true, message: 'Archivos recibidos y datos guardados' });
 
   } catch (error: any) {
-    console.error('❌ Error CRÍTICO al guardar:', error);
-    res.status(500).json({ success: false, error: 'Error interno: ' + error.message });
+    console.error('❌ Error al procesar archivos:', error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
