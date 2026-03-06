@@ -1,12 +1,8 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// Prisma Schema - Sazon Patrimonial
+// VERSION CORREGIDA Y COMPLETADA
 
 generator client {
   provider = "prisma-client-js"
- 
 }
 
 datasource db {
@@ -33,8 +29,6 @@ model Usuario {
   contrasena      String    @db.VarChar(255)
   id_rol          Int
   foto_evidencia  String?   @db.VarChar(500)
-   
-
   
   // Relaciones
   rol                    Rol                   @relation(fields: [id_rol], references: [id_rol], onDelete: Cascade)
@@ -51,18 +45,31 @@ model Usuario {
 }
 
 // ==================== TABLA: SolicitudRegistro ====================
+// CORREGIDA: Ahora incluye todos los campos necesarios para la solicitud
 model SolicitudRegistro {
   id_solicitud                  Int       @id @default(autoincrement())
   fecha                         DateTime  @db.Date
-  estado                        String    @db.VarChar(45)
-  nombre_propuesto_restaurante  String    @db.VarChar(50)
-  correo                        String    @db.VarChar(45)
-  nombre_propietario            String    @db.VarChar(45)
-  horario_atencion              String    @db.VarChar(45)
-  id_restaurante                Int
-  id_usuario                    Int
+  estado                        String    @db.VarChar(45) // Pendiente, Aprobado, Rechazado
   
+  // Datos Básicos
+  nombre_propuesto_restaurante  String    @db.VarChar(50)
+  nombre_propietario            String    @db.VarChar(45)
+  correo                        String    @db.VarChar(45)
+  
+  // Datos del Restaurante (AHORA SÍ LOS GUARDAMOS AQUÍ TAMBIÉN)
+  horario_atencion              String?   @db.VarChar(255)
+  direccion                     String?   @db.VarChar(500) // Link Google Maps
+  telefono                      String?   @db.VarChar(45)
+  facebook                      String?   @db.VarChar(100)
+  instagram                     String?   @db.VarChar(100)
+  etiquetas                     String?   @db.VarChar(200)
+  foto_portada                  String?   @db.VarChar(500)
+  menu_pdf                      String?   @db.VarChar(500)
+
   // Relaciones
+  id_usuario                    Int
+  id_restaurante                Int?      // <--- AHORA ES OPCIONAL (Puede ser NULL al inicio)
+  
   usuario          Usuario              @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade)
   restaurantes     Restaurante[]
   revisiones       RevisionSolicitud[]
@@ -77,18 +84,21 @@ model SolicitudRegistro {
 model Restaurante {
   id_restaurante      Int       @id @default(autoincrement())
   nombre              String    @db.VarChar(45)
-  horario             String    @db.VarChar(45)
-  telefono            String    @db.VarChar(45)
-  etiquetas           String    @db.VarChar(200)
+  horario             String?   @db.VarChar(45) // Opcional
+  telefono            String?   @db.VarChar(45) // Opcional
+  etiquetas           String?   @db.VarChar(200) // Opcional
+  
   id_solicitud        Int
   id_usuario          Int
-  direccion           String    @db.VarChar(45)
-  link_direccion      String    @db.Text
-  facebook            String    @db.VarChar(100)
-  instagram           String    @db.VarChar(100)
-  zona                String    @db.VarChar(100)
-  horario_atencion    String    @db.VarChar(255)
-  foto_portada        String    @db.VarChar(500)
+  
+  direccion           String?   @db.VarChar(45) // Dirección física corta
+  link_direccion      String?   @db.Text        // Link Google Maps largo
+  
+  facebook            String?   @db.VarChar(100)
+  instagram           String?   @db.VarChar(100)
+  zona                String?   @db.VarChar(100)
+  horario_atencion    String?   @db.VarChar(255)
+  foto_portada        String?   @db.VarChar(500)
   
   // Relaciones
   solicitud        SolicitudRegistro @relation(fields: [id_solicitud], references: [id_solicitud], onDelete: Cascade)
