@@ -33,6 +33,8 @@ model Usuario {
   contrasena      String    @db.VarChar(255)
   id_rol          Int
   foto_evidencia  String?   @db.VarChar(500)
+   
+
   
   // Relaciones
   rol                    Rol                   @relation(fields: [id_rol], references: [id_rol], onDelete: Cascade)

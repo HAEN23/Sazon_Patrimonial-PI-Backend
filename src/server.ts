@@ -12,15 +12,22 @@ const app = express();
 const PORT = process.env.PORT || 3003;
 const JWT_SECRET = process.env.JWT_SECRET || 'sazon_patrimonial_secret_key_2024';
 
-// Pool de conexiones PostgreSQL
-const pool = new Pool({
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5436'),
-  user: process.env.DB_USER || 'sazon_admin',
-  password: process.env.DB_PASSWORD || 'sazon_secure_2024',
-  database: process.env.DB_NAME || 'sazon_patrimonial',
-});
 
+// Pool de conexiones PostgreSQL
+console.log('--- DIAGNOSTICO DE CONEXION ---');
+console.log('Host:', process.env.DB_HOST);
+console.log('Port:', process.env.DB_PORT);
+console.log('User:', process.env.DB_USER);
+console.log('Database:', process.env.DB_NAME);
+console.log('-----------------------------');
+
+const pool = new Pool({
+  host: 'localhost',
+  port: 5436,             // <--- FORZADO A MANO
+  user: 'sazon_admin',    // <--- FORZADO A MANO
+  password: 'sazon_secure_2024', // <--- FORZADO A MANO
+  database: 'sazon_patrimonial', // <--- FORZADO A MANO
+});
 // Test de conexión
 pool.connect((err, client, release) => {
   if (err) {
@@ -28,6 +35,31 @@ pool.connect((err, client, release) => {
   } else {
     console.log('✅ Conectado a PostgreSQL');
     release();
+  }
+});
+
+// DIAGNÓSTICO DE TABLAS Y USUARIOS
+pool.query(`
+  SELECT table_name 
+  FROM information_schema.tables 
+  WHERE table_schema = 'public'
+`, (err, res) => {
+  if (err) console.error('Error diagnosticando:', err);
+  else {
+    console.log('--- TABLAS EN LA BASE DE DATOS (Servidor) ---');
+    console.table(res.rows);
+    console.log('---------------------------------------------');
+    
+    // Ver usuarios existentes
+    pool.query('SELECT id_usuario, correo, id_rol FROM usuario', (err, res) => {
+        if(!err) {
+            console.log('--- USUARIOS REALES EN LA BASE ---');
+            console.table(res.rows);
+            console.log('----------------------------------');
+        } else {
+            console.log('ERROR LEYENDO USUARIOS:', err.message);
+        }
+    });
   }
 });
 
