@@ -13,3 +13,161 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+// ==================== TABLA: Rol ====================
+model Rol {
+  id_rol     Int       @id @default(autoincrement())
+  nombre_rol String    @db.VarChar(50)
+  
+  // Relaciones
+  usuarios   Usuario[]
+  
+  @@map("rol")
+}
+
+// ==================== TABLA: Usuario ====================
+model Usuario {
+  id_usuario      Int       @id @default(autoincrement())
+  nombre          String    @db.VarChar(50)
+  correo          String    @unique @db.VarChar(50)
+  contrasena      String    @db.VarChar(255)
+  id_rol          Int
+  foto_evidencia  String?   @db.VarChar(500)
+  
+  // Relaciones
+  rol                    Rol                   @relation(fields: [id_rol], references: [id_rol], onDelete: Cascade)
+  revisiones             RevisionSolicitud[]
+  solicitudes_registro   SolicitudRegistro[]
+  favoritos              Favoritos[]
+  restaurantes           Restaurante[]
+  comprobantes           Comprobante[]
+  menus                  Menu[]
+  
+  @@map("usuario")
+  @@index([correo])
+  @@index([id_rol])
+}
+
+// ==================== TABLA: SolicitudRegistro ====================
+model SolicitudRegistro {
+  id_solicitud                  Int       @id @default(autoincrement())
+  fecha                         DateTime  @db.Date
+  estado                        String    @db.VarChar(45)
+  nombre_propuesto_restaurante  String    @db.VarChar(50)
+  correo                        String    @db.VarChar(45)
+  nombre_propietario            String    @db.VarChar(45)
+  horario_atencion              String    @db.VarChar(45)
+  id_restaurante                Int
+  id_usuario                    Int
+  
+  // Relaciones
+  usuario          Usuario              @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade)
+  restaurantes     Restaurante[]
+  revisiones       RevisionSolicitud[]
+  comprobantes     Comprobante[]
+  
+  @@map("solicitud_registro")
+  @@index([id_usuario])
+  @@index([estado])
+}
+
+// ==================== TABLA: Restaurante ====================
+model Restaurante {
+  id_restaurante      Int       @id @default(autoincrement())
+  nombre              String    @db.VarChar(45)
+  horario             String    @db.VarChar(45)
+  telefono            String    @db.VarChar(45)
+  etiquetas           String    @db.VarChar(200)
+  id_solicitud        Int
+  id_usuario          Int
+  direccion           String    @db.VarChar(45)
+  link_direccion      String    @db.Text
+  facebook            String    @db.VarChar(100)
+  instagram           String    @db.VarChar(100)
+  zona                String    @db.VarChar(100)
+  horario_atencion    String    @db.VarChar(255)
+  foto_portada        String    @db.VarChar(500)
+  
+  // Relaciones
+  solicitud        SolicitudRegistro @relation(fields: [id_solicitud], references: [id_solicitud], onDelete: Cascade)
+  usuario          Usuario           @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade)
+  favoritos        Favoritos[]
+  comprobantes     Comprobante[]
+  menus            Menu[]
+  
+  @@map("restaurante")
+  @@index([id_solicitud])
+  @@index([id_usuario])
+  @@index([zona])
+}
+
+// ==================== TABLA: RevisionSolicitud ====================
+model RevisionSolicitud {
+  id_revision    Int       @id @default(autoincrement())
+  fecha          String    @db.VarChar(45)
+  id_solicitud   Int
+  id_usuario     Int
+  
+  // Relaciones
+  solicitud      SolicitudRegistro @relation(fields: [id_solicitud], references: [id_solicitud], onDelete: Cascade)
+  usuario        Usuario           @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade)
+  
+  @@map("revision_solicitud")
+  @@index([id_solicitud])
+  @@index([id_usuario])
+}
+
+// ==================== TABLA: Comprobante ====================
+model Comprobante {
+  id_comprobante    String    @id @db.VarChar(50)
+  tipo              String    @db.VarChar(50)
+  ruta_archivo      String    @db.VarChar(500)
+  fecha_subida      DateTime  @db.Date
+  id_restaurante    Int
+  id_solicitud      Int
+  id_usuario        Int
+  
+  // Relaciones
+  restaurante    Restaurante       @relation(fields: [id_restaurante], references: [id_restaurante], onDelete: Cascade)
+  solicitud      SolicitudRegistro @relation(fields: [id_solicitud], references: [id_solicitud], onDelete: Cascade)
+  usuario        Usuario           @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade)
+  
+  @@map("comprobante")
+  @@index([id_restaurante])
+  @@index([id_solicitud])
+  @@index([id_usuario])
+}
+
+// ==================== TABLA: Menu ====================
+model Menu {
+  id_menu              Int       @id @default(autoincrement())
+  ruta_archivo         String    @db.VarChar(500)
+  id_restaurante       Int
+  id_usuario           Int
+  contador_descargas   Int       @default(0)
+  
+  // Relaciones
+  restaurante    Restaurante @relation(fields: [id_restaurante], references: [id_restaurante], onDelete: Cascade)
+  usuario        Usuario     @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade)
+  
+  @@map("menu")
+  @@index([id_restaurante])
+  @@index([id_usuario])
+}
+
+// ==================== TABLA: Favoritos ====================
+model Favoritos {
+  id_favorito      Int       @id @default(autoincrement())
+  id_usuario       Int
+  id_restaurante   Int
+  fecha_favorito   DateTime  @db.Date
+  
+  // Relaciones
+  usuario        Usuario      @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade)
+  restaurante    Restaurante  @relation(fields: [id_restaurante], references: [id_restaurante], onDelete: Cascade)
+  
+  @@unique([id_usuario, id_restaurante])
+  @@map("favoritos")
+  @@index([id_usuario])
+  @@index([id_restaurante])
+}
