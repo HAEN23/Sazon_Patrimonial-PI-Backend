@@ -1,32 +1,106 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { withErrorHandler } from '@/core/infrastructure/http/middleware/error.middleware';
-import { validateBody } from '@/core/infrastructure/http/middleware/validation.middleware';
-import { clientRegisterSchema } from '@/core/infrastructure/http/validators/client.validator';
-import { ClientRegisterUseCase } from '@/core/application/use-cases/auth/ClientRegister.usecase';
-import { ClientRegisterDto } from '@/core/application/use-cases/auth/ClientRegister.usecase';
-import { PrismaUserRepository } from '@/core/infrastructure/database/repositories/PrismaUserRepository';
-import { PrismaClientRepository } from '@/core/infrastructure/database/repositories/PrismaClientRepository';
-import { BcryptPasswordHasher } from '@/core/infrastructure/auth/BcryptPasswordHasher';
+import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
 
-export async function POST(request: NextRequest) {
-  return withErrorHandler(async () => {
-    const body = await validateBody<ClientRegisterDto>(request, clientRegisterSchema);
+const prisma = new PrismaClient();
 
-    const userRepository = new PrismaUserRepository();
-    const clientRepository = new PrismaClientRepository();
-    const passwordHasher = new BcryptPasswordHasher();
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+    const { nombre, correo, contrasena, id_rol } = body;
 
-    const useCase = new ClientRegisterUseCase(
-      userRepository,
-      clientRepository,
-      passwordHasher
+    console.log('📝 Solicitud de registro recibida:', { nombre, correo, id_rol });
+
+    // Validaciones
+    if (!nombre || !correo || !contrasena) {
+      console.log('❌ Faltan campos obligatorios');
+      return Response.json(
+        {
+          success: false,
+          error: 'Todos los campos son obligatorios',
+        },
+        { status: 400 }
+      );
+    }
+
+    // Verificar si el correo ya existe
+    const usuarioExistente = await prisma.usuario.findUnique({
+      where: { correo },
+    });
+
+    if (usuarioExistente) {
+      console.log('❌ Correo ya registrado:', correo);
+      return Response.json(
+        {
+          success: false,
+          error: 'Este correo ya está registrado',
+        },
+        { status: 400 }
+      );
+    }
+
+    // Hash de la contraseña
+    console.log('🔐 Hasheando contraseña...');
+    const hashedPassword = await bcrypt.hash(contrasena, 10);
+
+    // Crear usuario
+    console.log('💾 Creando usuario en la base de datos...');
+    const nuevoUsuario = await prisma.usuario.create({
+      data: {
+        nombre,
+        correo,
+        contrasena: hashedPassword,
+        id_rol: id_rol || 3, // Por defecto Usuario común
+        foto_evidencia: null,
+      },
+    });
+
+    console.log('✅ Usuario creado exitosamente:', nuevoUsuario.id_usuario);
+
+    // Generar token JWT
+    const token = jwt.sign(
+      {
+        id: nuevoUsuario.id_usuario,
+        role: nuevoUsuario.id_rol,
+      },
+      process.env.JWT_SECRET || 'secreto_temporal',
+      { expiresIn: '7d' }
     );
 
-    const result = await useCase.execute(body);
+    // Obtener nombre del rol
+    const rol = await prisma.rol.findUnique({
+      where: { id_rol: nuevoUsuario.id_rol },
+    });
 
-    return NextResponse.json({
-      success: true,
-      data: result,
-    }, { status: 201 });
-  })(request);
+    console.log('🎉 Registro completado exitosamente');
+
+    return Response.json(
+      {
+        success: true,
+        message: 'Usuario registrado exitosamente',
+        data: {
+          user: {
+            id: nuevoUsuario.id_usuario,
+            nombre: nuevoUsuario.nombre,
+            correo: nuevoUsuario.correo,
+            rol: nuevoUsuario.id_rol,
+            nombre_rol: rol?.nombre_rol || 'Usuario',
+            foto_evidencia: nuevoUsuario.foto_evidencia,
+          },
+          token,
+        },
+      },
+      { status: 201 }
+    );
+  } catch (error) {
+    console.error('❌ Error al registrar usuario:', error);
+    return Response.json(
+      {
+        success: false,
+        error: 'Error al registrar usuario',
+        details: error instanceof Error ? error.message : 'Error desconocido',
+      },
+      { status: 500 }
+    );
+  }
 }
