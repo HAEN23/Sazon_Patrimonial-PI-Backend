@@ -837,7 +837,8 @@ app.get('/api/solicitudes', authenticateToken, async (req: AuthRequest, res: Res
       SELECT 
         s.*,
         u.nombre as nombre_usuario,
-        u.correo as correo_usuario
+        u.correo as correo_usuario,
+        u.foto_evidencia as foto_propietario
       FROM solicitud_registro s
       LEFT JOIN usuario u ON s.id_usuario = u.id_usuario
     `;
@@ -862,10 +863,27 @@ app.get('/api/solicitudes', authenticateToken, async (req: AuthRequest, res: Res
     
     const result = await pool.query(query, params);
 
+    // Obtener comprobantes (imágenes) para cada solicitud
+    const solicitudesConImagenes = await Promise.all(
+      result.rows.map(async (solicitud) => {
+        const comprobantes = await pool.query(
+          'SELECT id_comprobante, tipo, ruta_archivo, fecha_subida FROM comprobante WHERE id_solicitud = $1',
+          [solicitud.id_solicitud]
+        );
+        
+        return {
+          ...solicitud,
+          comprobantes: comprobantes.rows,
+          imagenes: comprobantes.rows.filter((c: any) => c.tipo === 'imagen' || c.tipo === 'foto'),
+          documentos: comprobantes.rows.filter((c: any) => c.tipo === 'documento'),
+        };
+      })
+    );
+
     res.json({
       success: true,
-      count: result.rows.length,
-      data: result.rows,
+      count: solicitudesConImagenes.length,
+      data: solicitudesConImagenes,
     });
   } catch (error) {
     console.error('❌ Error:', error);
@@ -1060,40 +1078,114 @@ app.delete('/api/solicitudes/:id', authenticateToken, async (req: AuthRequest, r
   }
 });
 
-// Aprobar solicitud (solo admin)
+// Aprobar solicitud (solo admin) - CREA AUTOMÁTICAMENTE EL RESTAURANTE
 app.patch('/api/solicitudes/:id/aprobar', authenticateToken, isAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const result = await pool.query(
-      `UPDATE solicitud_registro SET estado = 'Aprobado' WHERE id_solicitud = $1 RETURNING *`,
+    const { direccion, telefono, zona, link_direccion, facebook, instagram } = req.body;
+    
+    // Obtener la solicitud primero
+    const solicitud = await pool.query(
+      'SELECT * FROM solicitud_registro WHERE id_solicitud = $1',
       [id]
     );
 
-    if (result.rows.length === 0) {
+    if (solicitud.rows.length === 0) {
       return res.status(404).json({
         success: false,
         error: 'Solicitud no encontrada',
       });
     }
 
+    const sol = solicitud.rows[0];
+
+    // Verificar si ya existe un restaurante para esta solicitud
+    const restauranteExistente = await pool.query(
+      'SELECT * FROM restaurante WHERE id_solicitud = $1',
+      [id]
+    );
+
+    if (restauranteExistente.rows.length > 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Ya existe un restaurante asociado a esta solicitud',
+      });
+    }
+
+    // Obtener la foto de portada de los comprobantes (primera imagen)
+    const comprobantes = await pool.query(
+      'SELECT ruta_archivo FROM comprobante WHERE id_solicitud = $1 AND tipo IN (\'imagen\', \'foto\') LIMIT 1',
+      [id]
+    );
+    const foto_portada = comprobantes.rows.length > 0 ? comprobantes.rows[0].ruta_archivo : '/images/default-restaurant.jpg';
+
+    // CREAR EL RESTAURANTE AUTOMÁTICAMENTE
+    const nuevoRestaurante = await pool.query(
+      `INSERT INTO restaurante (
+        nombre,
+        horario,
+        telefono,
+        etiquetas,
+        id_solicitud,
+        id_usuario,
+        direccion,
+        link_direccion,
+        facebook,
+        instagram,
+        zona,
+        horario_atencion,
+        foto_portada
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      RETURNING *`,
+      [
+        sol.nombre_propuesto_restaurante,
+        sol.horario_atencion,
+        telefono || 'Sin teléfono',
+        'comida típica, patrimonio',
+        id,
+        sol.id_usuario,
+        direccion || 'Sin dirección',
+        link_direccion || '',
+        facebook || '',
+        instagram || '',
+        zona || 'Quito Centro',
+        sol.horario_atencion,
+        foto_portada
+      ]
+    );
+
+    // Actualizar el estado de la solicitud a Aprobado
+    const resultSolicitud = await pool.query(
+      `UPDATE solicitud_registro SET estado = 'Aprobado' WHERE id_solicitud = $1 RETURNING *`,
+      [id]
+    );
+
+    console.log('✅ Solicitud aprobada y restaurante creado:', nuevoRestaurante.rows[0].id_restaurante);
+
     res.json({
       success: true,
-      message: 'Solicitud aprobada exitosamente',
-      data: result.rows[0],
+      message: 'Solicitud aprobada exitosamente y restaurante creado',
+      data: {
+        solicitud: resultSolicitud.rows[0],
+        restaurante: nuevoRestaurante.rows[0],
+      },
     });
   } catch (error) {
     console.error('❌ Error:', error);
     res.status(500).json({
       success: false,
       error: 'Error al aprobar solicitud',
+      details: error instanceof Error ? error.message : 'Error desconocido',
     });
   }
 });
 
-// Rechazar solicitud (solo admin)
+// Rechazar solicitud (solo admin) - SOLO CAMBIA EL ESTADO
 app.patch('/api/solicitudes/:id/rechazar', authenticateToken, isAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    const { motivo } = req.body; // Opcional: razón del rechazo
+    
     const result = await pool.query(
       `UPDATE solicitud_registro SET estado = 'Rechazado' WHERE id_solicitud = $1 RETURNING *`,
       [id]
@@ -1106,10 +1198,13 @@ app.patch('/api/solicitudes/:id/rechazar', authenticateToken, isAdmin, async (re
       });
     }
 
+    console.log('❌ Solicitud rechazada:', id, motivo ? `Motivo: ${motivo}` : '');
+
     res.json({
       success: true,
       message: 'Solicitud rechazada',
       data: result.rows[0],
+      motivo: motivo || undefined,
     });
   } catch (error) {
     console.error('❌ Error:', error);
