@@ -155,6 +155,8 @@ app.get('/', (req: Request, res: Response) => {
         delete: 'DELETE /api/restaurantes/:id [Auth Required, Admin]',
         byZona: 'GET /api/restaurantes/zona/:zona',
         search: 'GET /api/restaurantes/buscar?q=...',
+        miRestaurante: 'GET /api/mi-restaurante [Auth Required, Owner]',
+        updateMiRestaurante: 'PUT /api/mi-restaurante [Auth Required, Owner]',
       },
       solicitudes: {
         list: 'GET /api/solicitudes [Auth Required]',
@@ -822,6 +824,169 @@ app.get('/api/restaurantes/zona/:zona', async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       error: 'Error al obtener restaurantes por zona',
+    });
+  }
+});
+
+// Obtener MI restaurante (para el propietario)
+app.get('/api/mi-restaurante', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    // Buscar el restaurante del usuario autenticado
+    const result = await pool.query(`
+      SELECT 
+        r.*,
+        u.nombre as nombre_propietario,
+        u.correo as correo_propietario,
+        s.estado as estado_solicitud
+      FROM restaurante r
+      LEFT JOIN usuario u ON r.id_usuario = u.id_usuario
+      LEFT JOIN solicitud_registro s ON r.id_solicitud = s.id_solicitud
+      WHERE r.id_usuario = $1
+      LIMIT 1
+    `, [req.userId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'No tienes un restaurante asociado',
+        message: 'Debes crear una solicitud primero y esperar su aprobación',
+      });
+    }
+
+    // Obtener los menús del restaurante
+    const menus = await pool.query(
+      'SELECT * FROM menu WHERE id_restaurante = $1',
+      [result.rows[0].id_restaurante]
+    );
+
+    res.json({
+      success: true,
+      data: {
+        ...result.rows[0],
+        menus: menus.rows,
+      },
+    });
+  } catch (error) {
+    console.error('❌ Error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error al obtener tu restaurante',
+    });
+  }
+});
+
+// Actualizar MI restaurante (para el propietario)
+app.put('/api/mi-restaurante', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    // Buscar el restaurante del usuario autenticado
+    const restaurante = await pool.query(
+      'SELECT id_restaurante FROM restaurante WHERE id_usuario = $1',
+      [req.userId]
+    );
+
+    if (restaurante.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'No tienes un restaurante asociado',
+      });
+    }
+
+    const id_restaurante = restaurante.rows[0].id_restaurante;
+
+    const {
+      nombre,
+      horario,
+      telefono,
+      etiquetas,
+      direccion,
+      link_direccion,
+      facebook,
+      instagram,
+      zona,
+      horario_atencion,
+      foto_portada,
+    } = req.body;
+
+    // Actualizar solo los campos proporcionados
+    const updates: string[] = [];
+    const values: any[] = [];
+    let paramIndex = 1;
+
+    if (nombre !== undefined) {
+      updates.push(`nombre = $${paramIndex++}`);
+      values.push(nombre);
+    }
+    if (horario !== undefined) {
+      updates.push(`horario = $${paramIndex++}`);
+      values.push(horario);
+    }
+    if (telefono !== undefined) {
+      updates.push(`telefono = $${paramIndex++}`);
+      values.push(telefono);
+    }
+    if (etiquetas !== undefined) {
+      updates.push(`etiquetas = $${paramIndex++}`);
+      values.push(etiquetas);
+    }
+    if (direccion !== undefined) {
+      updates.push(`direccion = $${paramIndex++}`);
+      values.push(direccion);
+    }
+    if (link_direccion !== undefined) {
+      updates.push(`link_direccion = $${paramIndex++}`);
+      values.push(link_direccion);
+    }
+    if (facebook !== undefined) {
+      updates.push(`facebook = $${paramIndex++}`);
+      values.push(facebook);
+    }
+    if (instagram !== undefined) {
+      updates.push(`instagram = $${paramIndex++}`);
+      values.push(instagram);
+    }
+    if (zona !== undefined) {
+      updates.push(`zona = $${paramIndex++}`);
+      values.push(zona);
+    }
+    if (horario_atencion !== undefined) {
+      updates.push(`horario_atencion = $${paramIndex++}`);
+      values.push(horario_atencion);
+    }
+    if (foto_portada !== undefined) {
+      updates.push(`foto_portada = $${paramIndex++}`);
+      values.push(foto_portada);
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'No se proporcionaron campos para actualizar',
+      });
+    }
+
+    values.push(id_restaurante);
+
+    const query = `
+      UPDATE restaurante SET ${updates.join(', ')}
+      WHERE id_restaurante = $${paramIndex}
+      RETURNING *
+    `;
+
+    const result = await pool.query(query, values);
+
+    console.log('✅ Restaurante actualizado:', id_restaurante);
+
+    res.json({
+      success: true,
+      message: 'Restaurante actualizado exitosamente',
+      data: result.rows[0],
+    });
+  } catch (error) {
+    console.error('❌ Error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error al actualizar tu restaurante',
+      details: error instanceof Error ? error.message : 'Error desconocido',
     });
   }
 });
