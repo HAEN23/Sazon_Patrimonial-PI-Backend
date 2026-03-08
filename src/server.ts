@@ -134,16 +134,16 @@ app.post('/api/login', async (req: Request, res: Response) => {
 });
 
 // ============================================
-// REGISTRO DE USUARIOS (Con creación en tablas hijas)
+// REGISTRO DE USUARIOS (General)
 // ============================================
 app.post('/api/auth/register', async (req: Request, res: Response) => {
-  const client = await pool.connect();
+  const clientDB = await pool.connect();
   try {
-    await client.query('BEGIN');
+    await clientDB.query('BEGIN');
     const { nombre, correo, contrasena, id_rol } = req.body;
 
     // 1. Verificar si el correo ya existe
-    const userExists = await client.query('SELECT id_usuario FROM usuario WHERE correo = $1', [correo]);
+    const userExists = await clientDB.query('SELECT id_usuario FROM usuario WHERE correo = $1', [correo]);
     if (userExists.rows.length > 0) {
       throw new Error('El correo ya está registrado');
     }
@@ -157,40 +157,32 @@ app.post('/api/auth/register', async (req: Request, res: Response) => {
       VALUES ($1, $2, $3, $4) 
       RETURNING id_usuario
     `;
-    const userResult = await client.query(insertUserQuery, [nombre, correo, hashedPassword, id_rol]);
+    const userResult = await clientDB.query(insertUserQuery, [nombre, correo, hashedPassword, id_rol]);
     const nuevoIdUsuario = userResult.rows[0].id_usuario;
 
-    // 4. Crear registro en tabla hija según el rol
-    // Asumiendo que: 
-    // Rol 2 = Restaurantero
-    // Rol 3 = Cliente/Usuario Normal
-    
+    // 4. Crear registro en tabla hija según el rol usando "userId" (como lo define Prisma)
     if (id_rol === 2 || id_rol === '2') { // Es Restaurantero
-      // Creamos el RestaurantOwner ligado a este usuario
-      // NOTA: Ajusta el nombre de la tabla ('restaurant_owner' o como esté en tu DB real si no usas Prisma aquí)
       const insertOwnerQuery = `
-        INSERT INTO restaurant_owner (id_usuario) 
-        VALUES ($1)
+        INSERT INTO restaurant_owner ("userId", "createdAt") 
+        VALUES ($1, NOW())
       `;
-      await client.query(insertOwnerQuery, [nuevoIdUsuario]);
-      console.log(`✅ Restaurantero creado en restaurant_owner con ID Usuario: ${nuevoIdUsuario}`);
+      await clientDB.query(insertOwnerQuery, [nuevoIdUsuario]);
+      console.log(`✅ Restaurantero guardado en tabla 'restaurant_owner' con userId: ${nuevoIdUsuario}`);
 
     } else if (id_rol === 3 || id_rol === '3') { // Es Cliente
-      // Creamos el Client ligado a este usuario
       const insertClientQuery = `
-        INSERT INTO client (id_usuario) 
-        VALUES ($1)
+        INSERT INTO client ("userId", "createdAt", "updatedAt") 
+        VALUES ($1, NOW(), NOW())
       `;
-      await client.query(insertClientQuery, [nuevoIdUsuario]);
-      console.log(`✅ Cliente creado en client con ID Usuario: ${nuevoIdUsuario}`);
+      await clientDB.query(insertClientQuery, [nuevoIdUsuario]);
+      console.log(`✅ Cliente guardado en tabla 'client' con userId: ${nuevoIdUsuario}`);
     }
 
-    await client.query('COMMIT');
+    await clientDB.query('COMMIT');
     
-    // Generamos un token para que inicie sesión automáticamente
-    const token = jwt.sign({ id: nuevoIdUsuario, role: id_rol }, JWT_SECRET, { expiresIn: '1h' });
+    const token = jwt.sign({ id: nuevoIdUsuario, role: id_rol }, JWT_SECRET, { expiresIn: '7d' });
     
-    res.json({ 
+    res.status(201).json({ 
       success: true, 
       message: 'Usuario registrado exitosamente',
       token,
@@ -198,72 +190,65 @@ app.post('/api/auth/register', async (req: Request, res: Response) => {
     });
 
   } catch (error: any) {
-    await client.query('ROLLBACK');
-    console.error("Error en el registro:", error);
-    res.status(500).json({ success: false, error: error.message || 'Error en el servidor durante el registro' });
+    await clientDB.query('ROLLBACK');
+    console.error("❌ Error en el registro general:", error);
+    res.status(500).json({ success: false, error: error.message || 'Error en el servidor' });
   } finally {
-    client.release();
+    clientDB.release();
   }
 });
 
-// REGISTRO DE USUARIO (Cliente)
+// ============================================
+// REGISTRO DE USUARIO (Cliente / Restaurantero desde el Frontend)
+// ============================================
 app.post('/api/auth/client/register', async (req: Request, res: Response) => {
+  const clientDB = await pool.connect();
   try {
+    await clientDB.query('BEGIN');
     const { nombre, correo, contrasena, id_rol } = req.body;
 
     console.log('📝 Solicitud de registro recibida:', { nombre, correo, id_rol });
 
-    // Validaciones
     if (!nombre || !correo || !contrasena) {
-      console.log('❌ Faltan campos obligatorios');
-      return res.status(400).json({
-        success: false,
-        error: 'Todos los campos son obligatorios',
-      });
+      throw new Error('Todos los campos son obligatorios');
     }
 
     // Verificar si el correo ya existe
-    const usuarioExistente = await pool.query('SELECT * FROM usuario WHERE correo = $1', [correo]);
-
+    const usuarioExistente = await clientDB.query('SELECT * FROM usuario WHERE correo = $1', [correo]);
     if (usuarioExistente.rows.length > 0) {
-      console.log('❌ Correo ya registrado:', correo);
-      return res.status(400).json({
-        success: false,
-        error: 'Este correo ya está registrado',
-      });
+      throw new Error('Este correo ya está registrado');
     }
 
     // Hash de la contraseña
-    console.log('🔐 Hasheando contraseña...');
     const hashedPassword = await bcrypt.hash(contrasena, 10);
 
-    // Crear usuario
-    console.log('💾 Creando usuario en la base de datos...');
-    const nuevoUsuario = await pool.query(
+    // Crear usuario en tabla principal
+    const rolAsignado = id_rol || 3; // Por defecto es 3 (Cliente)
+    const nuevoUsuario = await clientDB.query(
       `INSERT INTO usuario (nombre, correo, contrasena, id_rol, foto_evidencia) 
        VALUES ($1, $2, $3, $4, $5) 
-       RETURNING id_usuario, nombre, correo, id_rol, foto_evidencia`,
-      [nombre, correo, hashedPassword, id_rol || 3, null]
+       RETURNING id_usuario, nombre, correo, id_rol`,
+      [nombre, correo, hashedPassword, rolAsignado, null]
     );
 
     const user = nuevoUsuario.rows[0];
-    console.log('✅ Usuario creado exitosamente:', user.id_usuario);
 
-    // Generar token JWT
-    const token = jwt.sign(
-      {
-        id: user.id_usuario,
-        role: user.id_rol,
-      },
-      JWT_SECRET,
-      { expiresIn: '7d' }
-    );
+    // Insertar en la tabla hija correspondiente según Prisma ("userId")
+    if (rolAsignado === 2 || rolAsignado === '2') {
+      await clientDB.query(`INSERT INTO restaurant_owner ("userId", "createdAt") VALUES ($1, NOW())`, [user.id_usuario]);
+      console.log(`✅ Restaurantero creado exitosamente en 'restaurant_owner'`);
+    } else if (rolAsignado === 3 || rolAsignado === '3') {
+      await clientDB.query(`INSERT INTO client ("userId", "createdAt", "updatedAt") VALUES ($1, NOW(), NOW())`, [user.id_usuario]);
+      console.log(`✅ Cliente creado exitosamente en 'client'`);
+    }
 
-    // Obtener nombre del rol
+    await clientDB.query('COMMIT');
+
+    const token = jwt.sign({ id: user.id_usuario, role: user.id_rol }, JWT_SECRET, { expiresIn: '7d' });
+    
+    // Obtener nombre del rol para la respuesta
     const rolResult = await pool.query('SELECT nombre_rol FROM rol WHERE id_rol = $1', [user.id_rol]);
     const nombreRol = rolResult.rows[0]?.nombre_rol || 'Usuario';
-
-    console.log('🎉 Registro completado exitosamente');
 
     return res.status(201).json({
       success: true,
@@ -274,19 +259,20 @@ app.post('/api/auth/client/register', async (req: Request, res: Response) => {
           nombre: user.nombre,
           correo: user.correo,
           rol: user.id_rol,
-          nombre_rol: nombreRol,
-          foto_evidencia: user.foto_evidencia,
+          nombre_rol: nombreRol
         },
         token,
       },
     });
-  } catch (error) {
+  } catch (error: any) {
+    await clientDB.query('ROLLBACK');
     console.error('❌ Error al registrar usuario:', error);
-    return res.status(500).json({
+    return res.status(400).json({
       success: false,
-      error: 'Error al registrar usuario',
-      details: error instanceof Error ? error.message : 'Error desconocido',
+      error: error.message || 'Error al registrar usuario'
     });
+  } finally {
+    clientDB.release();
   }
 });
 
