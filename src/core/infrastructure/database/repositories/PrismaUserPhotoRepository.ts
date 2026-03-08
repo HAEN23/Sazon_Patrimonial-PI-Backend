@@ -14,7 +14,7 @@ export class PrismaUserPhotoRepository implements IUserPhotoRepository {
         restaurant: true,
       },
       orderBy: {
-        createdAt: 'desc',
+        uploadedAt: 'desc',
       },
     });
 
@@ -49,7 +49,7 @@ export class PrismaUserPhotoRepository implements IUserPhotoRepository {
         restaurant: true,
       },
       orderBy: {
-        createdAt: 'desc',
+        uploadedAt: 'desc',
       },
     });
 
@@ -68,7 +68,7 @@ export class PrismaUserPhotoRepository implements IUserPhotoRepository {
         restaurant: true,
       },
       orderBy: {
-        createdAt: 'desc',
+        uploadedAt: 'desc',
       },
     });
 

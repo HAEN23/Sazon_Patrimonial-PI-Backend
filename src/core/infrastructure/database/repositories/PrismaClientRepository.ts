@@ -77,19 +77,22 @@ export class PrismaClientRepository implements IClientRepository {
   async findMostActive(limit: number): Promise<Client[]> {
     const clients = await prisma.client.findMany({
       include: {
-        user: true,
-        _count: {
-          select: { favorites: true },
-        },
-      },
-      orderBy: {
-        favorites: {
-          _count: 'desc',
+        user: {
+          include: {
+            favoritos: true,
+          },
         },
       },
       take: limit,
     });
 
-    return clients.map((client: any) => Client.fromPrisma(client));
+    // Ordenar por cantidad de favoritos en memoria
+    const sorted = clients.sort((a: any, b: any) => {
+      const aCount = a.user?.favoritos?.length || 0;
+      const bCount = b.user?.favoritos?.length || 0;
+      return bCount - aCount;
+    });
+
+    return sorted.map((client: any) => Client.fromPrisma(client));
   }
 }

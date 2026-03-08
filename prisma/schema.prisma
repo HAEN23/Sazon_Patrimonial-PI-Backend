@@ -1,6 +1,3 @@
-// Prisma Schema - Sazon Patrimonial
-// VERSION CORREGIDA Y COMPLETADA
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,178 +7,214 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ==================== TABLA: Rol ====================
-model Rol {
-  id_rol     Int       @id @default(autoincrement())
-  nombre_rol String    @db.VarChar(50)
-  
-  // Relaciones
-  usuarios   Usuario[]
-  
-  @@map("rol")
+model administrator {
+  userId    Int      @id
+  createdAt DateTime @default(now())
+  usuario   usuario  @relation(fields: [userId], references: [id_usuario], onDelete: Cascade)
 }
 
-// ==================== TABLA: Usuario ====================
-model Usuario {
-  id_usuario      Int       @id @default(autoincrement())
-  nombre          String    @db.VarChar(50)
-  correo          String    @unique @db.VarChar(50)
-  contrasena      String    @db.VarChar(255)
-  id_rol          Int
-  foto_evidencia  String?   @db.VarChar(500)
-  
-  // Relaciones
-  rol                    Rol                   @relation(fields: [id_rol], references: [id_rol], onDelete: Cascade)
-  revisiones             RevisionSolicitud[]
-  solicitudes_registro   SolicitudRegistro[]
-  favoritos              Favoritos[]
-  restaurantes           Restaurante[]
-  comprobantes           Comprobante[]
-  menus                  Menu[]
-  
-  @@map("usuario")
-  @@index([correo])
-  @@index([id_rol])
+model application {
+  id                     Int               @id @default(autoincrement())
+  proposedRestaurantName String            @db.VarChar(100)
+  ownerName              String            @db.VarChar(100)
+  email                  String            @db.VarChar(100)
+  schedule               String            @db.VarChar(255)
+  status                 ApplicationStatus @default(pendiente)
+  ownerId                Int
+  restaurantId           Int?              @unique
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime
+  restaurant_owner       restaurant_owner  @relation(fields: [ownerId], references: [userId], onDelete: Cascade)
+  restaurante            restaurante?      @relation(fields: [restaurantId], references: [id_restaurante])
+
+  @@index([ownerId])
+  @@index([status])
 }
 
-// ==================== TABLA: SolicitudRegistro ====================
-// CORREGIDA: Ahora incluye todos los campos necesarios para la solicitud
-model SolicitudRegistro {
-  id_solicitud                  Int       @id @default(autoincrement())
-  fecha                         DateTime  @db.Date
-  estado                        String    @db.VarChar(45) // Pendiente, Aprobado, Rechazado
-  
-  // Datos Básicos
-  nombre_propuesto_restaurante  String    @db.VarChar(50)
-  nombre_propietario            String    @db.VarChar(45)
-  correo                        String    @db.VarChar(45)
-  
-  // Datos del Restaurante (AHORA SÍ LOS GUARDAMOS AQUÍ TAMBIÉN)
-  horario_atencion              String?   @db.VarChar(255)
-  direccion                     String?   @db.VarChar(500) // Link Google Maps
-  telefono                      String?   @db.VarChar(45)
-  facebook                      String?   @db.VarChar(100)
-  instagram                     String?   @db.VarChar(100)
-  etiquetas                     String?   @db.VarChar(200)
-  foto_portada                  String?   @db.VarChar(500)
-  foto_2                        String?   @db.VarChar(500)
-  foto_3                        String?   @db.VarChar(500)
-  menu_pdf                      String?   @db.VarChar(500)
+model client {
+  userId    Int      @id
+  phone     String?  @db.VarChar(20)
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+  usuario   usuario  @relation(fields: [userId], references: [id_usuario], onDelete: Cascade)
+}
 
-  // Relaciones
-  id_usuario                    Int
-  id_restaurante                Int?      // <--- AHORA ES OPCIONAL (Puede ser NULL al inicio)
-  
-  usuario          Usuario              @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade)
-  restaurantes     Restaurante[]
-  revisiones       RevisionSolicitud[]
-  comprobantes     Comprobante[]
-  
-  @@map("solicitud_registro")
+model comprobante {
+  id_comprobante     String             @id @db.VarChar(50)
+  tipo               String             @db.VarChar(50)
+  ruta_archivo       String             @db.VarChar(500)
+  fecha_subida       DateTime           @db.Date
+  id_restaurante     Int
+  id_solicitud       Int
+  id_usuario         Int
+  restaurante        restaurante        @relation(fields: [id_restaurante], references: [id_restaurante], onDelete: Cascade)
+  solicitud_registro solicitud_registro @relation(fields: [id_solicitud], references: [id_solicitud], onDelete: Cascade)
+  usuario            usuario            @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade)
+
+  @@index([id_restaurante])
+  @@index([id_solicitud])
   @@index([id_usuario])
-  @@index([estado])
 }
 
-// ==================== TABLA: Restaurante ====================
-model Restaurante {
-  id_restaurante      Int       @id @default(autoincrement())
-  nombre              String    @db.VarChar(45)
-  horario             String?   @db.VarChar(45) // Opcional
-  telefono            String?   @db.VarChar(45) // Opcional
-  etiquetas           String?   @db.VarChar(200) // Opcional
-  
-  id_solicitud        Int
-  id_usuario          Int
-  
-  direccion           String?   @db.VarChar(45) // Dirección física corta
-  link_direccion      String?   @db.Text        // Link Google Maps largo
-  
-  facebook            String?   @db.VarChar(100)
-  instagram           String?   @db.VarChar(100)
-  zona                String?   @db.VarChar(100)
-  horario_atencion    String?   @db.VarChar(255)
-  foto_portada        String?   @db.VarChar(500)
-  
-  // Relaciones
-  solicitud        SolicitudRegistro @relation(fields: [id_solicitud], references: [id_solicitud], onDelete: Cascade)
-  usuario          Usuario           @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade)
-  favoritos        Favoritos[]
-  comprobantes     Comprobante[]
-  menus            Menu[]
-  
-  @@map("restaurante")
+model download {
+  id               Int              @id @default(autoincrement())
+  downloadCount    Int              @default(0)
+  origin           DownloadOrigin
+  opinion          OpinionType
+  ownerId          Int
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime
+  restaurant_owner restaurant_owner @relation(fields: [ownerId], references: [userId], onDelete: Cascade)
+
+  @@index([origin])
+  @@index([ownerId])
+}
+
+model favoritos {
+  id_favorito    Int         @id @default(autoincrement())
+  id_usuario     Int
+  id_restaurante Int
+  fecha_favorito DateTime    @db.Date
+  restaurante    restaurante @relation(fields: [id_restaurante], references: [id_restaurante], onDelete: Cascade)
+  usuario        usuario     @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade)
+
+  @@unique([id_usuario, id_restaurante])
+  @@index([id_restaurante])
+  @@index([id_usuario])
+}
+
+model menu {
+  id_menu            Int         @id @default(autoincrement())
+  ruta_archivo       String      @db.VarChar(500)
+  id_restaurante     Int
+  id_usuario         Int
+  contador_descargas Int         @default(0)
+  restaurante        restaurante @relation(fields: [id_restaurante], references: [id_restaurante], onDelete: Cascade)
+  usuario            usuario     @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade)
+
+  @@index([id_restaurante])
+  @@index([id_usuario])
+}
+
+model restaurant_owner {
+  userId      Int           @id
+  createdAt   DateTime      @default(now())
+  application application[]
+  download    download[]
+  usuario     usuario       @relation(fields: [userId], references: [id_usuario], onDelete: Cascade)
+}
+
+model restaurante {
+  id_restaurante     Int                @id @default(autoincrement())
+  nombre             String             @db.VarChar(45)
+  horario            String?            @db.VarChar(45)
+  telefono           String?            @db.VarChar(45)
+  etiquetas          String?            @db.VarChar(200)
+  id_solicitud       Int
+  id_usuario         Int
+  direccion          String?            @db.VarChar(45)
+  link_direccion     String?
+  facebook           String?            @db.VarChar(100)
+  instagram          String?            @db.VarChar(100)
+  zona               String?            @db.VarChar(100)
+  horario_atencion   String?            @db.VarChar(255)
+  foto_portada       String?            @db.VarChar(500)
+  application        application?
+  comprobante        comprobante[]
+  favoritos          favoritos[]
+  menu               menu[]
+  solicitud_registro solicitud_registro @relation(fields: [id_solicitud], references: [id_solicitud], onDelete: Cascade)
+  usuario            usuario            @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade)
+
   @@index([id_solicitud])
   @@index([id_usuario])
   @@index([zona])
 }
 
-// ==================== TABLA: RevisionSolicitud ====================
-model RevisionSolicitud {
-  id_revision    Int       @id @default(autoincrement())
-  fecha          String    @db.VarChar(45)
-  id_solicitud   Int
-  id_usuario     Int
-  
-  // Relaciones
-  solicitud      SolicitudRegistro @relation(fields: [id_solicitud], references: [id_solicitud], onDelete: Cascade)
-  usuario        Usuario           @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade)
-  
-  @@map("revision_solicitud")
+model revision_solicitud {
+  id_revision        Int                @id @default(autoincrement())
+  fecha              String             @db.VarChar(45)
+  id_solicitud       Int
+  id_usuario         Int
+  solicitud_registro solicitud_registro @relation(fields: [id_solicitud], references: [id_solicitud], onDelete: Cascade)
+  usuario            usuario            @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade)
+
   @@index([id_solicitud])
   @@index([id_usuario])
 }
 
-// ==================== TABLA: Comprobante ====================
-model Comprobante {
-  id_comprobante    String    @id @db.VarChar(50)
-  tipo              String    @db.VarChar(50)
-  ruta_archivo      String    @db.VarChar(500)
-  fecha_subida      DateTime  @db.Date
-  id_restaurante    Int
-  id_solicitud      Int
-  id_usuario        Int
-  
-  // Relaciones
-  restaurante    Restaurante       @relation(fields: [id_restaurante], references: [id_restaurante], onDelete: Cascade)
-  solicitud      SolicitudRegistro @relation(fields: [id_solicitud], references: [id_solicitud], onDelete: Cascade)
-  usuario        Usuario           @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade)
-  
-  @@map("comprobante")
-  @@index([id_restaurante])
-  @@index([id_solicitud])
+model rol {
+  id_rol     Int       @id @default(autoincrement())
+  nombre_rol String    @db.VarChar(50)
+  usuario    usuario[]
+}
+
+model solicitud_registro {
+  id_solicitud                 Int                  @id @default(autoincrement())
+  fecha                        DateTime             @db.Date
+  estado                       String               @db.VarChar(45)
+  nombre_propuesto_restaurante String               @db.VarChar(50)
+  correo                       String               @db.VarChar(45)
+  nombre_propietario           String               @db.VarChar(45)
+  horario_atencion             String?              @db.VarChar(255)
+  id_restaurante               Int?
+  id_usuario                   Int
+  direccion                    String?              @db.VarChar(500)
+  etiquetas                    String?              @db.VarChar(200)
+  facebook                     String?              @db.VarChar(100)
+  foto_portada                 String?              @db.VarChar(500)
+  instagram                    String?              @db.VarChar(100)
+  menu_pdf                     String?              @db.VarChar(500)
+  telefono                     String?              @db.VarChar(45)
+  foto_2                       String?              @db.VarChar(500)
+  foto_3                       String?              @db.VarChar(500)
+  comprobante                  comprobante[]
+  restaurante                  restaurante[]
+  revision_solicitud           revision_solicitud[]
+  usuario                      usuario              @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade)
+
+  @@index([estado])
   @@index([id_usuario])
 }
 
-// ==================== TABLA: Menu ====================
-model Menu {
-  id_menu              Int       @id @default(autoincrement())
-  ruta_archivo         String    @db.VarChar(500)
-  id_restaurante       Int
-  id_usuario           Int
-  contador_descargas   Int       @default(0)
-  
-  // Relaciones
-  restaurante    Restaurante @relation(fields: [id_restaurante], references: [id_restaurante], onDelete: Cascade)
-  usuario        Usuario     @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade)
-  
-  @@map("menu")
-  @@index([id_restaurante])
-  @@index([id_usuario])
+model usuario {
+  id_usuario         Int                  @id @default(autoincrement())
+  nombre             String               @db.VarChar(50)
+  correo             String               @unique @db.VarChar(50)
+  contrasena         String               @db.VarChar(255)
+  id_rol             Int
+  foto_evidencia     String?              @db.VarChar(500)
+  administrator      administrator?
+  client             client?
+  comprobante        comprobante[]
+  favoritos          favoritos[]
+  menu               menu[]
+  restaurant_owner   restaurant_owner?
+  restaurante        restaurante[]
+  revision_solicitud revision_solicitud[]
+  solicitud_registro solicitud_registro[]
+  rol                rol                  @relation(fields: [id_rol], references: [id_rol], onDelete: Cascade)
+
+  @@index([correo])
+  @@index([id_rol])
 }
 
-// ==================== TABLA: Favoritos ====================
-model Favoritos {
-  id_favorito      Int       @id @default(autoincrement())
-  id_usuario       Int
-  id_restaurante   Int
-  fecha_favorito   DateTime  @db.Date
-  
-  // Relaciones
-  usuario        Usuario      @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade)
-  restaurante    Restaurante  @relation(fields: [id_restaurante], references: [id_restaurante], onDelete: Cascade)
-  
-  @@unique([id_usuario, id_restaurante])
-  @@map("favoritos")
-  @@index([id_usuario])
-  @@index([id_restaurante])
+enum ApplicationStatus {
+  pendiente
+  aprobado
+  rechazado
+  en_revision
+}
+
+enum DownloadOrigin {
+  Nacional
+  Extranjero
+}
+
+enum OpinionType {
+  La_comida
+  La_ubicacion
+  Recomendacion
+  El_horario
+  La_vista
 }

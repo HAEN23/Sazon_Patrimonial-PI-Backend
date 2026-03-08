@@ -7,7 +7,6 @@ export class PrismaRestaurantOwnerRepository implements IRestaurantOwnerReposito
     const owners = await prisma.restaurantOwner.findMany({
       include: {
         user: true,
-        restaurants: true,
         applications: true,
       },
     });

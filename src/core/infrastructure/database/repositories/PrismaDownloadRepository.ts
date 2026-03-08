@@ -76,8 +76,8 @@ export class PrismaDownloadRepository implements IDownloadRepository {
     const created = await prisma.download.create({
       data: {
         ownerId: download.ownerId,
-        origin: download.origin,
-        opinion: download.opinion,
+        origin: download.origin as any,
+        opinion: download.opinion as any,
       },
       include: {
         owner: {
@@ -96,8 +96,8 @@ export class PrismaDownloadRepository implements IDownloadRepository {
       where: { id: download.id },
       data: {
         downloadCount: download.downloadCount,
-        origin: download.origin,
-        opinion: download.opinion,
+        origin: download.origin as any,
+        opinion: download.opinion as any,
       },
       include: {
         owner: {

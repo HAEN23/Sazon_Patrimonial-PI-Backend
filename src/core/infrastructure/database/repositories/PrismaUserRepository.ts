@@ -4,7 +4,7 @@ import { User } from '@/core/domain/entities/User.entity';
 
 export class PrismaUserRepository implements IUserRepository {
   async findAll(): Promise<User[]> {
-    const users = await prisma.user.findMany({
+    const users = await prisma.usuario.findMany({
       include: {
         administrator: true,
         restaurantOwner: true,
@@ -12,12 +12,21 @@ export class PrismaUserRepository implements IUserRepository {
       },
     });
 
-    return users.map((user: any) => User.fromPrisma(user));
+    return users.map((user: any) => User.fromPrisma({
+      id: user.id_usuario,
+      name: user.nombre,
+      email: user.correo,
+      password: user.contrasena,
+      type: user.tipo,
+      createdAt: user.created_at,
+      updatedAt: user.updated_at,
+      ...user
+    }));
   }
 
   async findById(id: number): Promise<User | null> {
-    const user = await prisma.user.findUnique({
-      where: { id },
+    const user = await prisma.usuario.findUnique({
+      where: { id_usuario: id },
       include: {
         administrator: true,
         restaurantOwner: true,
@@ -25,12 +34,21 @@ export class PrismaUserRepository implements IUserRepository {
       },
     });
 
-    return user ? User.fromPrisma(user) : null;
+    return user ? User.fromPrisma({
+      id: user.id_usuario,
+      name: user.nombre,
+      email: user.correo,
+      password: user.contrasena,
+      type: user.tipo,
+      createdAt: user.created_at,
+      updatedAt: user.updated_at,
+      ...user
+    }) : null;
   }
 
   async findByEmail(email: string): Promise<User | null> {
-    const user = await prisma.user.findUnique({
-      where: { email },
+    const user = await prisma.usuario.findUnique({
+      where: { correo: email },
       include: {
         administrator: true,
         restaurantOwner: true,
@@ -38,12 +56,21 @@ export class PrismaUserRepository implements IUserRepository {
       },
     });
 
-    return user ? User.fromPrisma(user) : null;
+    return user ? User.fromPrisma({
+      id: user.id_usuario,
+      name: user.nombre,
+      email: user.correo,
+      password: user.contrasena,
+      type: user.tipo,
+      createdAt: user.created_at,
+      updatedAt: user.updated_at,
+      ...user
+    }) : null;
   }
 
   async findByType(type: string): Promise<User[]> {
-    const users = await prisma.user.findMany({
-      where: { type },
+    const users = await prisma.usuario.findMany({
+      where: { tipo: type },
       include: {
         administrator: true,
         restaurantOwner: true,
@@ -51,16 +78,26 @@ export class PrismaUserRepository implements IUserRepository {
       },
     });
 
-    return users.map((user: any) => User.fromPrisma(user));
+    return users.map((user: any) => User.fromPrisma({
+      id: user.id_usuario,
+      name: user.nombre,
+      email: user.correo,
+      password: user.contrasena,
+      type: user.tipo,
+      createdAt: user.created_at,
+      updatedAt: user.updated_at,
+      ...user
+    }));
   }
 
   async save(user: User): Promise<User> {
-    const created = await prisma.user.create({
+    const created = await prisma.usuario.create({
       data: {
-        name: user.name,
-        email: user.email.getValue(),
-        password: user.password.getValue(),
-        type: user.type,
+        nombre: user.name,
+        correo: user.email.getValue(),
+        contrasena: user.password.getValue(),
+        tipo: user.type,
+        id_rol: 1, // Default role, adjust as needed
       },
       include: {
         administrator: true,
@@ -69,17 +106,26 @@ export class PrismaUserRepository implements IUserRepository {
       },
     });
 
-    return User.fromPrisma(created);
+    return User.fromPrisma({
+      id: created.id_usuario,
+      name: created.nombre,
+      email: created.correo,
+      password: created.contrasena,
+      type: created.tipo,
+      createdAt: created.created_at,
+      updatedAt: created.updated_at,
+      ...created
+    });
   }
 
   async update(user: User): Promise<User> {
-    const updated = await prisma.user.update({
-      where: { id: user.id },
+    const updated = await prisma.usuario.update({
+      where: { id_usuario: user.id },
       data: {
-        name: user.name,
-        email: user.email.getValue(),
-        password: user.password.getValue(),
-        type: user.type,
+        nombre: user.name,
+        correo: user.email.getValue(),
+        contrasena: user.password.getValue(),
+        tipo: user.type,
       },
       include: {
         administrator: true,
@@ -88,13 +134,22 @@ export class PrismaUserRepository implements IUserRepository {
       },
     });
 
-    return User.fromPrisma(updated);
+    return User.fromPrisma({
+      id: updated.id_usuario,
+      name: updated.nombre,
+      email: updated.correo,
+      password: updated.contrasena,
+      type: updated.tipo,
+      createdAt: updated.created_at,
+      updatedAt: updated.updated_at,
+      ...updated
+    });
   }
 
   async delete(id: number): Promise<boolean> {
     try {
-      await prisma.user.delete({
-        where: { id },
+      await prisma.usuario.delete({
+        where: { id_usuario: id },
       });
       return true;
     } catch (error) {
@@ -103,20 +158,20 @@ export class PrismaUserRepository implements IUserRepository {
   }
 
   async existsByEmail(email: string): Promise<boolean> {
-    const count = await prisma.user.count({
-      where: { email },
+    const count = await prisma.usuario.count({
+      where: { correo: email },
     });
 
     return count > 0;
   }
 
   async count(): Promise<number> {
-    return await prisma.user.count();
+    return await prisma.usuario.count();
   }
 
   async countByType(type: string): Promise<number> {
-    return await prisma.user.count({
-      where: { type },
+    return await prisma.usuario.count({
+      where: { tipo: type },
     });
   }
 }
