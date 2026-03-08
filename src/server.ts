@@ -133,6 +133,79 @@ app.post('/api/login', async (req: Request, res: Response) => {
   }
 });
 
+// ============================================
+// REGISTRO DE USUARIOS (Con creación en tablas hijas)
+// ============================================
+app.post('/api/auth/register', async (req: Request, res: Response) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { nombre, correo, contrasena, id_rol } = req.body;
+
+    // 1. Verificar si el correo ya existe
+    const userExists = await client.query('SELECT id_usuario FROM usuario WHERE correo = $1', [correo]);
+    if (userExists.rows.length > 0) {
+      throw new Error('El correo ya está registrado');
+    }
+
+    // 2. Encriptar contraseña
+    const hashedPassword = await bcrypt.hash(contrasena, 10);
+
+    // 3. Insertar en la tabla principal (usuario)
+    const insertUserQuery = `
+      INSERT INTO usuario (nombre, correo, contrasena, id_rol) 
+      VALUES ($1, $2, $3, $4) 
+      RETURNING id_usuario
+    `;
+    const userResult = await client.query(insertUserQuery, [nombre, correo, hashedPassword, id_rol]);
+    const nuevoIdUsuario = userResult.rows[0].id_usuario;
+
+    // 4. Crear registro en tabla hija según el rol
+    // Asumiendo que: 
+    // Rol 2 = Restaurantero
+    // Rol 3 = Cliente/Usuario Normal
+    
+    if (id_rol === 2 || id_rol === '2') { // Es Restaurantero
+      // Creamos el RestaurantOwner ligado a este usuario
+      // NOTA: Ajusta el nombre de la tabla ('restaurant_owner' o como esté en tu DB real si no usas Prisma aquí)
+      const insertOwnerQuery = `
+        INSERT INTO restaurant_owner (id_usuario) 
+        VALUES ($1)
+      `;
+      await client.query(insertOwnerQuery, [nuevoIdUsuario]);
+      console.log(`✅ Restaurantero creado en restaurant_owner con ID Usuario: ${nuevoIdUsuario}`);
+
+    } else if (id_rol === 3 || id_rol === '3') { // Es Cliente
+      // Creamos el Client ligado a este usuario
+      const insertClientQuery = `
+        INSERT INTO client (id_usuario) 
+        VALUES ($1)
+      `;
+      await client.query(insertClientQuery, [nuevoIdUsuario]);
+      console.log(`✅ Cliente creado en client con ID Usuario: ${nuevoIdUsuario}`);
+    }
+
+    await client.query('COMMIT');
+    
+    // Generamos un token para que inicie sesión automáticamente
+    const token = jwt.sign({ id: nuevoIdUsuario, role: id_rol }, JWT_SECRET, { expiresIn: '1h' });
+    
+    res.json({ 
+      success: true, 
+      message: 'Usuario registrado exitosamente',
+      token,
+      user: { id: nuevoIdUsuario, nombre, role: id_rol }
+    });
+
+  } catch (error: any) {
+    await client.query('ROLLBACK');
+    console.error("Error en el registro:", error);
+    res.status(500).json({ success: false, error: error.message || 'Error en el servidor durante el registro' });
+  } finally {
+    client.release();
+  }
+});
+
 // REGISTRO DE USUARIO (Cliente)
 app.post('/api/auth/client/register', async (req: Request, res: Response) => {
   try {
@@ -578,12 +651,15 @@ app.put('/api/mi-restaurante', authenticateToken, uploadFields, async (req: Requ
   }
 });
 
+// ============================================
 // APROBAR SOLICITUD (Admin)
+// ============================================
 app.patch('/api/solicitudes/:id/aprobar', authenticateToken, isAdmin, async (req: Request, res: Response) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     const { id } = req.params;
+    const adminId = (req as any).user.id; // Extraemos el ID del Admin que hizo la acción
 
     // 1. Obtener solicitud
     const solRes = await client.query('SELECT * FROM solicitud_registro WHERE id_solicitud = $1', [id]);
@@ -600,12 +676,11 @@ app.patch('/api/solicitudes/:id/aprobar', authenticateToken, isAdmin, async (req
       RETURNING id_restaurante
     `;
     
-    // Mapeamos los campos de la solicitud al restaurante
     const nuevoRest = await client.query(insertRest, [
       sol.nombre_propuesto_restaurante,
-      sol.id_usuario,
+      sol.id_usuario, // Este es el ID del dueño del restaurante
       sol.id_solicitud,
-      sol.direccion, // Link de Maps
+      sol.direccion, 
       sol.telefono,
       sol.horario_atencion,
       sol.facebook,
@@ -622,8 +697,16 @@ app.patch('/api/solicitudes/:id/aprobar', authenticateToken, isAdmin, async (req
       [idRestaurante, id]
     );
 
+    // 4. NUEVO: Insertar el registro en la tabla de revision_solicitud
+    // Como tu base de datos espera un String en la fecha (VarChar), le pasamos un toLocaleString()
+    const fechaRevision = new Date().toLocaleString('es-MX'); 
+    await client.query(
+      "INSERT INTO revision_solicitud (fecha, id_solicitud, id_usuario) VALUES ($1, $2, $3)",
+      [fechaRevision, id, adminId]
+    );
+
     await client.query('COMMIT');
-    res.json({ success: true, message: 'Restaurante aprobado y creado' });
+    res.json({ success: true, message: 'Restaurante aprobado y creado. Revisión registrada.' });
 
   } catch (error: any) {
     await client.query('ROLLBACK');
@@ -634,14 +717,34 @@ app.patch('/api/solicitudes/:id/aprobar', authenticateToken, isAdmin, async (req
   }
 });
 
+// ============================================
 // RECHAZAR SOLICITUD (Admin)
+// ============================================
 app.patch('/api/solicitudes/:id/rechazar', authenticateToken, isAdmin, async (req: Request, res: Response) => {
+  const client = await pool.connect();
   try {
+    await client.query('BEGIN');
     const { id } = req.params;
-    await pool.query("UPDATE solicitud_registro SET estado = 'Rechazado' WHERE id_solicitud = $1", [id]);
-    res.json({ success: true, message: 'Solicitud rechazada' });
+    const adminId = (req as any).user.id; // Extraemos el ID del Admin
+
+    // 1. Cambiar estado de la solicitud a "Rechazado"
+    await client.query("UPDATE solicitud_registro SET estado = 'Rechazado' WHERE id_solicitud = $1", [id]);
+
+    // 2. NUEVO: Insertar el registro en la tabla de revision_solicitud
+    const fechaRevision = new Date().toLocaleString('es-MX');
+    await client.query(
+      "INSERT INTO revision_solicitud (fecha, id_solicitud, id_usuario) VALUES ($1, $2, $3)",
+      [fechaRevision, id, adminId]
+    );
+
+    await client.query('COMMIT');
+    res.json({ success: true, message: 'Solicitud rechazada y revisión registrada.' });
   } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error rechazando:', error);
     res.status(500).json({ success: false, error: 'Error al rechazar' });
+  } finally {
+    client.release();
   }
 });
 
