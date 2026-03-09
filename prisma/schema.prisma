@@ -122,6 +122,7 @@ model restaurante {
   application        application?
   comprobante        comprobante[]
   favoritos          favoritos[]
+  foto_usuario       foto_usuario[]
   menu               menu[]
   solicitud_registro solicitud_registro @relation(fields: [id_solicitud], references: [id_solicitud], onDelete: Cascade)
   usuario            usuario            @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade)
@@ -188,6 +189,7 @@ model usuario {
   client             client?
   comprobante        comprobante[]
   favoritos          favoritos[]
+  foto_usuario       foto_usuario[]
   menu               menu[]
   restaurant_owner   restaurant_owner?
   restaurante        restaurante[]
@@ -217,4 +219,17 @@ enum OpinionType {
   Recomendacion
   El_horario
   La_vista
+}
+
+model foto_usuario {
+  id_foto        Int         @id @default(autoincrement())
+  url_foto       String      @db.VarChar(500)
+  id_usuario     Int
+  id_restaurante Int
+  fecha_subida   DateTime    @default(now())
+  restaurante    restaurante @relation(fields: [id_restaurante], references: [id_restaurante], onDelete: Cascade)
+  usuario        usuario     @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade)
+
+  @@index([id_restaurante])
+  @@index([id_usuario])
 }

@@ -121,7 +121,7 @@ app.post('/api/login', async (req: Request, res: Response) => {
 
     if (isMatch) { 
       // ¡ÉXITO!
-      const token = jwt.sign({ id: user.id_usuario, role: user.id_rol }, JWT_SECRET, { expiresIn: '1h' });
+      const token = jwt.sign({ id: user.id_usuario, role: user.id_rol }, JWT_SECRET, { expiresIn: '50d' });
       res.json({ success: true, token, user: { id: user.id_usuario, nombre: user.nombre, role: user.id_rol } });
     } else {
       // CONTRASEÑA MAL
@@ -180,7 +180,7 @@ app.post('/api/auth/register', async (req: Request, res: Response) => {
 
     await clientDB.query('COMMIT');
     
-    const token = jwt.sign({ id: nuevoIdUsuario, role: id_rol }, JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ id: nuevoIdUsuario, role: id_rol }, JWT_SECRET, { expiresIn: '50d' });
     
     res.status(201).json({ 
       success: true, 
@@ -244,7 +244,7 @@ app.post('/api/auth/client/register', async (req: Request, res: Response) => {
 
     await clientDB.query('COMMIT');
 
-    const token = jwt.sign({ id: user.id_usuario, role: user.id_rol }, JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ id: user.id_usuario, role: user.id_rol }, JWT_SECRET, { expiresIn: '50d' });
     
     // Obtener nombre del rol para la respuesta
     const rolResult = await pool.query('SELECT nombre_rol FROM rol WHERE id_rol = $1', [user.id_rol]);
@@ -882,6 +882,179 @@ async function uploadToCloudinary(fileBuffer: Buffer, folder: string, resourceTy
     uploadStream.end(fileBuffer);
   });
 }
+
+// ============================================
+// FAVORITOS
+// ============================================
+
+// 1. Alternar Favorito (Agregar o Quitar)
+app.post('/api/favorites/toggle', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user.id;
+    const { restauranteId } = req.body;
+
+    // Verificar si ya está en favoritos
+    const checkResult = await pool.query(
+      'SELECT * FROM favoritos WHERE id_usuario = $1 AND id_restaurante = $2', 
+      [userId, restauranteId]
+    );
+
+    if (checkResult.rows.length > 0) {
+      // Si ya es favorito, lo eliminamos
+      await pool.query('DELETE FROM favoritos WHERE id_usuario = $1 AND id_restaurante = $2', [userId, restauranteId]);
+      res.json({ success: true, message: 'Removido de favoritos', isFavorite: false });
+    } else {
+      // ✅ AHORA SÍ: Insertamos el registro incluyendo la fecha actual (CURRENT_DATE)
+      await pool.query(
+        'INSERT INTO favoritos (id_usuario, id_restaurante, fecha_favorito) VALUES ($1, $2, CURRENT_DATE)', 
+        [userId, restauranteId]
+      );
+      res.json({ success: true, message: 'Agregado a favoritos', isFavorite: true });
+    }
+  } catch (error) {
+    // Esto imprimirá el error real en la terminal de tu backend por si llega a fallar algo más
+    console.error('Error en favoritos:', error); 
+    res.status(500).json({ success: false, error: 'Error procesando favorito' });
+  }
+});
+
+// 2. Comprobar si un restaurante ya es favorito (Para la persistencia)
+app.get('/api/favorites/check', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user.id;
+    const { restauranteId } = req.query;
+
+    const checkResult = await pool.query(
+      'SELECT * FROM favoritos WHERE id_usuario = $1 AND id_restaurante = $2', 
+      [userId, restauranteId]
+    );
+
+    res.json({ success: true, isFavorite: checkResult.rows.length > 0 });
+  } catch (error) {
+    console.error('Error verificando favorito:', error);
+    res.status(500).json({ success: false, error: 'Error verificando favorito' });
+  }
+});
+
+// ============================================
+// FOTOS DE USUARIOS
+// ============================================
+
+// 1. Subir Foto (Requiere Token y haber dado Like)
+app.post('/api/photos', authenticateToken, upload.single('file'), async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user.id;
+    const restaurantId = req.body.restaurantId;
+    const file = req.file;
+
+    if (!file) return res.status(400).json({ success: false, error: 'No se detectó ninguna imagen' });
+    if (!restaurantId) return res.status(400).json({ success: false, error: 'Falta el ID del restaurante' });
+
+    // REGLA: Verificar si el usuario ya le dio a Favoritos
+    const likeCheck = await pool.query(
+      'SELECT * FROM favoritos WHERE id_usuario = $1 AND id_restaurante = $2',
+      [userId, restaurantId]
+    );
+
+    if (likeCheck.rows.length === 0) {
+       return res.status(403).json({ success: false, error: 'Debes darle a Favoritos (Like) antes de subir una foto.' });
+    }
+
+    // Subir a Cloudinary
+    const fotoUrl = await uploadToCloudinary(file.buffer, 'fotos_usuarios');
+
+    // Guardar en la Base de Datos
+    await pool.query(
+      'INSERT INTO foto_usuario (id_usuario, id_restaurante, url_foto, fecha_subida) VALUES ($1, $2, $3, CURRENT_DATE)',
+      [userId, restaurantId, fotoUrl]
+    );
+
+    res.json({ success: true, url: fotoUrl });
+  } catch (error) {
+    console.error('Error subiendo foto de usuario:', error);
+    res.status(500).json({ success: false, error: 'Error interno al guardar la foto' });
+  }
+});
+
+// 2. Obtener todas las fotos de un restaurante
+app.get('/api/photos/restaurant/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query(
+      'SELECT url_foto as url FROM foto_usuario WHERE id_restaurante = $1 ORDER BY fecha_subida DESC', 
+      [id]
+    );
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    console.error('Error obteniendo fotos:', error);
+    res.status(500).json({ success: false, error: 'Error al obtener fotos' });
+  }
+});
+
+// ============================================
+// ESTADÍSTICAS DEL RESTAURANTE
+// ============================================
+app.get('/api/restaurants/:id/stats', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    // 1. Contar LIKES
+    const likesQuery = await pool.query('SELECT COUNT(*) as total FROM favoritos WHERE id_restaurante = $1', [id]);
+    const totalLikes = parseInt(likesQuery.rows[0].total) || 0;
+
+    // 2. Contar DESCARGAS DE MENÚ
+    // Sumamos el contador_descargas de la tabla menu para ese restaurante
+    const descargasQuery = await pool.query('SELECT SUM(contador_descargas) as total FROM menu WHERE id_restaurante = $1', [id]);
+    const totalDescargas = parseInt(descargasQuery.rows[0].total) || 0;
+
+    res.json({
+      success: true,
+      data: {
+        likes: totalLikes,
+        visitas: 0,
+        descargasMenu: totalDescargas, // ✅ Ahora envía las descargas reales
+        respuestasEncuesta: 0 
+      }
+    });
+  } catch (error) {
+    console.error('Error obteniendo estadísticas:', error);
+    res.status(500).json({ success: false, error: 'Error al obtener las estadísticas' });
+  }
+});
+
+// ============================================
+// REGISTRAR CLIC/DESCARGA DE MENÚ
+// ============================================
+app.post('/api/restaurants/:id/menu/click', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    // Verificamos si ya existe un registro de menú para este restaurante
+    const menuCheck = await pool.query('SELECT id_menu FROM menu WHERE id_restaurante = $1', [id]);
+
+    if (menuCheck.rows.length > 0) {
+      // Si existe, le sumamos 1 a la columna contador_descargas
+      await pool.query('UPDATE menu SET contador_descargas = contador_descargas + 1 WHERE id_restaurante = $1', [id]);
+    } else {
+      // Si no existe, buscamos al dueño del restaurante para crear el registro inicial
+      const restResult = await pool.query('SELECT id_usuario FROM restaurante WHERE id_restaurante = $1', [id]);
+      
+      if (restResult.rows.length > 0) {
+         const idUsuario = restResult.rows[0].id_usuario;
+         // Insertamos el menú con el contador en 1
+         await pool.query(
+           'INSERT INTO menu (id_restaurante, id_usuario, contador_descargas, ruta_archivo) VALUES ($1, $2, 1, $3)', 
+           [id, idUsuario, 'Menú incrustado']
+         );
+      }
+    }
+    
+    res.json({ success: true, message: 'Descarga registrada exitosamente' });
+  } catch (error) {
+    console.error('Error registrando descarga:', error);
+    res.status(500).json({ success: false, error: 'Error al registrar descarga' });
+  }
+});
 
 app.listen(port, () => {
   console.log(`🚀 Servidor corriendo en http://localhost:${port}`);
