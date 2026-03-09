@@ -14,6 +14,9 @@ export interface GetRestaurantResult {
   likesCount: number;
   createdAt: Date;
   updatedAt: Date;
+  // Agregamos los campos opcionales para menús y solicitud
+  menus?: any[]; 
+  application?: any;
 }
 
 /**
@@ -42,6 +45,9 @@ export class GetRestaurantUseCase {
       likesCount: restaurant.likesCount,
       createdAt: restaurant.createdAt,
       updatedAt: restaurant.updatedAt,
+      // Devolvemos al frontend los menús y la solicitud
+      menus: restaurant.menus,
+      application: restaurant.application,
     };
   }
 }

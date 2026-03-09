@@ -2,6 +2,10 @@ import { Phone } from '../value-objects/Phone.vo';
 import { Url } from '../value-objects/Url.vo';
 
 export class Restaurant {
+  // Agregamos las propiedades para mantener los datos anidados
+  public menus?: any[];
+  public application?: any;
+
   constructor(
     public readonly id: number,
     public name: string,
@@ -64,7 +68,7 @@ export class Restaurant {
   }
 
   static fromPrisma(prismaRestaurant: any): Restaurant {
-    return new Restaurant(
+    const restaurant = new Restaurant(
       prismaRestaurant.id,
       prismaRestaurant.name,
       prismaRestaurant.schedule,
@@ -79,6 +83,12 @@ export class Restaurant {
       new Date(prismaRestaurant.createdAt),
       new Date(prismaRestaurant.updatedAt)
     );
+
+    // Rescatamos las relaciones anidadas (menús y solicitud) para que no se pierdan
+    restaurant.menus = prismaRestaurant.menus || prismaRestaurant.menu || [];
+    restaurant.application = prismaRestaurant.application || null;
+
+    return restaurant;
   }
 
   incrementLikes(): void {
@@ -143,6 +153,9 @@ export class Restaurant {
       likesCount: this.likesCount,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,
+      // Incluimos las propiedades nuevas al convertir a JSON
+      menus: this.menus,
+      application: this.application,
     };
   }
 }
