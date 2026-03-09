@@ -893,6 +893,22 @@ app.post('/api/favorites/toggle', authenticateToken, async (req: Request, res: R
     const userId = (req as any).user.id;
     const { restauranteId } = req.body;
 
+    // 1. Verificar el rol del usuario desde la base de datos (La fuente de la verdad)
+    const usuarioBD = await pool.query('SELECT id_rol FROM usuario WHERE id_usuario = $1', [userId]);
+    
+    if (usuarioBD.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Usuario no encontrado' });
+    }
+
+    // 2. Verificar que NO sea Restaurantero (rol 2)
+    if (usuarioBD.rows[0].id_rol === 2) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Los restauranteros no pueden dar likes.' 
+      });
+    }
+
+    // 3. Si es Cliente (rol 3) o Admin (rol 1), puede dar like
     // Verificar si ya está en favoritos
     const checkResult = await pool.query(
       'SELECT * FROM favoritos WHERE id_usuario = $1 AND id_restaurante = $2', 
@@ -949,6 +965,17 @@ app.post('/api/photos', authenticateToken, upload.single('file'), async (req: Re
 
     if (!file) return res.status(400).json({ success: false, error: 'No se detectó ninguna imagen' });
     if (!restaurantId) return res.status(400).json({ success: false, error: 'Falta el ID del restaurante' });
+
+    // 🔒 1. VERIFICAR EL ROL EN LA BASE DE DATOS
+    const usuarioQuery = await pool.query('SELECT id_rol FROM usuario WHERE id_usuario = $1', [userId]);
+    const usuario = usuarioQuery.rows[0];
+
+    if (usuario && usuario.id_rol === 2) {
+      return res.status(403).json({ 
+        success: false, 
+        message: "Acción denegada: Los restauranteros no pueden subir fotos como clientes." 
+      });
+    }
 
     // REGLA: Verificar si el usuario ya le dio a Favoritos
     const likeCheck = await pool.query(
@@ -1107,6 +1134,18 @@ app.get('/api/restaurants/:id/survey/check', authenticateToken, async (req: Requ
     const userId = (req as any).user.id;
     const restaurantId = req.params.id;
 
+    // 🔒 VERIFICAR EL ROL EN LA BASE DE DATOS
+    const usuarioQuery = await pool.query('SELECT id_rol FROM usuario WHERE id_usuario = $1', [userId]);
+    const usuario = usuarioQuery.rows[0];
+
+    // Si es restaurantero, lo rebotamos desde la verificación
+    if (usuario && usuario.id_rol === 2) {
+      return res.status(403).json({ 
+        success: false, 
+        message: "Como Restaurantero, no puedes responder encuestas de satisfacción." 
+      });
+    }
+
     const checkResult = await pool.query(
       'SELECT id_encuesta FROM encuesta_restaurante WHERE id_usuario = $1 AND id_restaurante = $2',
       [userId, restaurantId]
@@ -1123,6 +1162,17 @@ app.post('/api/restaurants/:id/survey', authenticateToken, async (req: Request, 
   try {
     const userId = (req as any).user.id;
     const restaurantId = req.params.id;
+
+    // 🔒 1. VERIFICAR EL ROL EN LA BASE DE DATOS
+    const usuarioQuery = await pool.query('SELECT id_rol FROM usuario WHERE id_usuario = $1', [userId]);
+    const usuario = usuarioQuery.rows[0];
+
+    if (usuario && usuario.id_rol === 2) {
+      return res.status(403).json({ 
+        success: false, 
+        message: "Acción denegada: Los restauranteros no pueden responder encuestas." 
+      });
+    }
 
     await pool.query(
       'INSERT INTO encuesta_restaurante (id_usuario, id_restaurante, fecha_registro) VALUES ($1, $2, CURRENT_DATE)',
