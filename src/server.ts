@@ -1003,17 +1003,58 @@ app.get('/api/restaurants/:id/stats', authenticateToken, async (req: Request, re
     const totalLikes = parseInt(likesQuery.rows[0].total) || 0;
 
     // 2. Contar DESCARGAS DE MENÚ
-    // Sumamos el contador_descargas de la tabla menu para ese restaurante
     const descargasQuery = await pool.query('SELECT SUM(contador_descargas) as total FROM menu WHERE id_restaurante = $1', [id]);
     const totalDescargas = parseInt(descargasQuery.rows[0].total) || 0;
+
+    // 3. Contar ENCUESTAS RESPONDIDAS
+    const encuestasQuery = await pool.query('SELECT COUNT(*) as total FROM encuesta_restaurante WHERE id_restaurante = $1', [id]);
+    const totalEncuestas = parseInt(encuestasQuery.rows[0].total) || 0;
+
+    // 4. Consultar conteo de Aspectos (Pregunta 1)
+    const aspectosQuery = await pool.query(`
+      SELECT 
+        COUNT(CASE WHEN voto_aspecto = 'Sabor' THEN 1 END) as sabor,
+        COUNT(CASE WHEN voto_aspecto = 'Servicio' THEN 1 END) as servicio,
+        COUNT(CASE WHEN voto_aspecto = 'Precio' THEN 1 END) as precio,
+        COUNT(CASE WHEN voto_aspecto = 'Ambiente' THEN 1 END) as ambiente,
+        COUNT(CASE WHEN voto_aspecto = 'Limpieza' THEN 1 END) as limpieza
+      FROM encuesta_restaurante WHERE id_restaurante = $1`, [id]);
+
+    // 5. Consultar conteo de Recomendación (Pregunta 2)
+    const recomendacionQuery = await pool.query(`
+      SELECT 
+        COUNT(CASE WHEN voto_recomendacion = 'Definitivamente sí' THEN 1 END) as def_si,
+        COUNT(CASE WHEN voto_recomendacion = 'Probablemente sí' THEN 1 END) as prob_si,
+        COUNT(CASE WHEN voto_recomendacion = 'No lo sé' THEN 1 END) as ns_nc,
+        COUNT(CASE WHEN voto_recomendacion = 'Probablemente no' THEN 1 END) as prob_no,
+        COUNT(CASE WHEN voto_recomendacion = 'Definitivamente no' THEN 1 END) as def_no
+      FROM encuesta_restaurante WHERE id_restaurante = $1`, [id]);
+
+    const asp = aspectosQuery.rows[0];
+    const rec = recomendacionQuery.rows[0];
 
     res.json({
       success: true,
       data: {
         likes: totalLikes,
         visitas: 0,
-        descargasMenu: totalDescargas, // ✅ Ahora envía las descargas reales
-        respuestasEncuesta: 0 
+        descargasMenu: totalDescargas,
+        respuestasEncuesta: totalEncuestas,
+        // Enviamos los datos para las dos gráficas
+        statsAspectos: [
+          parseInt(asp.sabor) || 0,
+          parseInt(asp.servicio) || 0,
+          parseInt(asp.precio) || 0,
+          parseInt(asp.ambiente) || 0,
+          parseInt(asp.limpieza) || 0
+        ],
+        statsRecomendacion: [
+          parseInt(rec.def_si) || 0,
+          parseInt(rec.prob_si) || 0,
+          parseInt(rec.ns_nc) || 0,
+          parseInt(rec.prob_no) || 0,
+          parseInt(rec.def_no) || 0
+        ]
       }
     });
   } catch (error) {
@@ -1053,6 +1094,47 @@ app.post('/api/restaurants/:id/menu/click', async (req: Request, res: Response) 
   } catch (error) {
     console.error('Error registrando descarga:', error);
     res.status(500).json({ success: false, error: 'Error al registrar descarga' });
+  }
+});
+
+// ============================================
+// ENCUESTAS
+// ============================================
+
+// 1. Verificar si el usuario ya respondió (Para bloquear el botón)
+app.get('/api/restaurants/:id/survey/check', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user.id;
+    const restaurantId = req.params.id;
+
+    const checkResult = await pool.query(
+      'SELECT id_encuesta FROM encuesta_restaurante WHERE id_usuario = $1 AND id_restaurante = $2',
+      [userId, restaurantId]
+    );
+
+    res.json({ success: true, hasAnswered: checkResult.rows.length > 0 });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Error verificando encuesta' });
+  }
+});
+
+// 2. Guardar que el usuario ya respondió
+app.post('/api/restaurants/:id/survey', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user.id;
+    const restaurantId = req.params.id;
+
+    await pool.query(
+      'INSERT INTO encuesta_restaurante (id_usuario, id_restaurante, fecha_registro) VALUES ($1, $2, CURRENT_DATE)',
+      [userId, restaurantId]
+    );
+
+    res.json({ success: true, message: 'Encuesta registrada exitosamente' });
+  } catch (error: any) {
+    if (error.code === '23505') { // Código de PostgreSQL para duplicados
+       return res.status(400).json({ success: false, error: 'Ya has respondido esta encuesta.' });
+    }
+    res.status(500).json({ success: false, error: 'Error guardando encuesta' });
   }
 });
 

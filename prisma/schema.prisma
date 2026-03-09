@@ -233,3 +233,13 @@ model foto_usuario {
   @@index([id_restaurante])
   @@index([id_usuario])
 }
+
+model encuesta_restaurante {
+  id_encuesta    Int         @id @default(autoincrement())
+  id_usuario     Int
+  id_restaurante Int
+  fecha_registro DateTime    @default(now())
+
+  // ✅ ESTO ES MAGIA: Evita que en la base de datos existan 2 votos del mismo usuario para el mismo restaurante
+  @@unique([id_usuario, id_restaurante]) 
+}
