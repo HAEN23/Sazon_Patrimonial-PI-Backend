@@ -763,6 +763,42 @@ app.get('/api/restaurantes', async (req: Request, res: Response) => {
 });
 
 // ============================================
+// OBTENER UN RESTAURANTE ESPECÍFICO POR ID
+// ============================================
+app.get('/api/restaurantes/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query(`
+      SELECT 
+        r.id_restaurante,
+        r.nombre,
+        r.telefono,
+        r.link_direccion as direccion,
+        r.horario_atencion,
+        r.facebook,
+        r.instagram,
+        r.foto_portada,
+        s.foto_2,
+        s.foto_3,
+        s.menu_pdf as pdf_url,
+        s.etiquetas
+      FROM restaurante r
+      LEFT JOIN solicitud_registro s ON r.id_solicitud = s.id_solicitud
+      WHERE r.id_restaurante = $1
+    `, [id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Restaurante no encontrado' });
+    }
+
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    console.error('❌ Error obteniendo el restaurante individual:', error);
+    res.status(500).json({ success: false, error: 'Error al obtener el restaurante' });
+  }
+});
+
+// ============================================
 // OBTENER RESTAURANTES ACTIVOS (Admin)
 // ============================================
 app.get('/api/admin/restaurantes', authenticateToken, isAdmin, async (req: Request, res: Response) => {
