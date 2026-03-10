@@ -1047,29 +1047,72 @@ app.get('/api/restaurants/:id/stats', authenticateToken, async (req: Request, re
   try {
     const { id } = req.params;
 
-    // 1. 💖 CONTAR LOS LIKES REALES DEL RESTAURANTE
-    const likesQuery = await pool.query(
-      'SELECT COUNT(*) as total_likes FROM favoritos WHERE id_restaurante = $1',
-      [id]
-    );
+    // 1. LIKES Y DESCARGAS
+    const likesQuery = await pool.query('SELECT COUNT(*) as total_likes FROM favoritos WHERE id_restaurante = $1', [id]);
     const totalLikes = parseInt(likesQuery.rows[0].total_likes, 10) || 0;
 
-    // 2. 📥 OBTENER LAS DESCARGAS REALES DEL MENÚ 
-    const descargasQuery = await pool.query(
-      'SELECT SUM(contador_descargas) as total_descargas FROM menu WHERE id_restaurante = $1',
-      [id]
-    );
+    const descargasQuery = await pool.query('SELECT SUM(contador_descargas) as total_descargas FROM menu WHERE id_restaurante = $1', [id]);
     const totalDescargas = parseInt(descargasQuery.rows[0].total_descargas, 10) || 0;
 
-    // 3. Enviamos los datos reales al Frontend para que dibuje la gráfica
+    // 2. ENCUESTAS - ASPECTOS DESTACADOS
+    const aspectosQuery = await pool.query(`
+      SELECT atraccion, COUNT(*) as cantidad 
+      FROM encuesta_restaurante 
+      WHERE id_restaurante = $1 
+      GROUP BY atraccion
+    `, [id]);
+
+    let totalEncuestas = 0;
+    const conteoAspectos = { vista: 0, comida: 0, higiene: 0 }; 
+
+    aspectosQuery.rows.forEach(row => {
+       const cantidad = parseInt(row.cantidad, 10);
+       totalEncuestas += cantidad;
+       // Agrupamos: 'vista', 'ubicacion', 'horario' cuentan como Ambiente.
+       if(row.atraccion === 'vista' || row.atraccion === 'ubicacion' || row.atraccion === 'horario') conteoAspectos.vista += cantidad; 
+       if(row.atraccion === 'comida') conteoAspectos.comida += cantidad; 
+       if(row.atraccion === 'higiene') conteoAspectos.higiene += cantidad; 
+    });
+
+    // Calcular porcentajes: [Ambiente, Comida, Higiene]
+    const statsAspectos = [0, 0, 0];
+    if (totalEncuestas > 0) {
+      statsAspectos[0] = Math.round((conteoAspectos.vista / totalEncuestas) * 100);
+      statsAspectos[1] = Math.round((conteoAspectos.comida / totalEncuestas) * 100);
+      statsAspectos[2] = Math.round((conteoAspectos.higiene / totalEncuestas) * 100);
+    }
+
+    // 3. ENCUESTAS - ORIGEN
+    const origenQuery = await pool.query(`
+      SELECT origen, COUNT(*) as cantidad 
+      FROM encuesta_restaurante 
+      WHERE id_restaurante = $1 
+      GROUP BY origen
+    `, [id]);
+
+    const conteoOrigen = { nacional: 0, extranjero: 0 };
+    origenQuery.rows.forEach(row => {
+      if(row.origen === 'nacional') conteoOrigen.nacional = parseInt(row.cantidad, 10);
+      if(row.origen === 'extranjero') conteoOrigen.extranjero = parseInt(row.cantidad, 10);
+    });
+
+    // Calcular porcentajes: [Locales, Extranjeros]
+    const statsOrigen = [0, 0];
+    if (totalEncuestas > 0) {
+       statsOrigen[0] = Math.round((conteoOrigen.nacional / totalEncuestas) * 100);
+       statsOrigen[1] = Math.round((conteoOrigen.extranjero / totalEncuestas) * 100);
+    }
+
+    // 4. RESPUESTA FINAL AL FRONTEND
     res.json({
       success: true,
       data: {
         likes: totalLikes, 
-        descargasMenu: totalDescargas, // 👈 ¡Aquí mandamos las descargas reales!
-        respuestasEncuesta: 0,
-        statsAspectos: [0, 0, 0, 0, 0],
-        statsRecomendacion: [0, 0, 0, 0, 0]
+        descargasMenu: totalDescargas, 
+        respuestasEncuesta: totalEncuestas,
+        statsAspectos: statsAspectos,
+        statsOrigen: statsOrigen, // <-- Para la gráfica de pastel
+        statsRecomendacion: [0, 0, 0, 0, 0] 
       }
     });
 
@@ -1146,33 +1189,37 @@ app.get('/api/restaurants/:id/survey/check', authenticateToken, async (req: Requ
   }
 });
 
-// 2. Guardar que el usuario ya respondió
+// 2. Guardar que el usuario ya respondió con sus respuestas
 app.post('/api/restaurants/:id/survey', authenticateToken, async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
     const restaurantId = req.params.id;
+    const { atraccion, origen } = req.body; // Recibimos las respuestas del frontend
 
-    // 🔒 1. VERIFICAR EL ROL EN LA BASE DE DATOS
+    // 🔒 1. VERIFICAR EL ROL
     const usuarioQuery = await pool.query('SELECT id_rol FROM usuario WHERE id_usuario = $1', [userId]);
     const usuario = usuarioQuery.rows[0];
 
     if (usuario && usuario.id_rol === 2) {
-      return res.status(403).json({ 
-        success: false, 
-        message: "Acción denegada: Los restauranteros no pueden responder encuestas." 
-      });
+      return res.status(403).json({ success: false, message: "Los restauranteros no pueden responder encuestas." });
     }
 
+    if (!atraccion || !origen) {
+       return res.status(400).json({ success: false, message: "Faltan datos de la encuesta." });
+    }
+
+    // Guardar la encuesta en la BD con los nuevos campos
     await pool.query(
-      'INSERT INTO encuesta_restaurante (id_usuario, id_restaurante, fecha_registro) VALUES ($1, $2, CURRENT_DATE)',
-      [userId, restaurantId]
+      'INSERT INTO encuesta_restaurante (id_usuario, id_restaurante, atraccion, origen, fecha_registro) VALUES ($1, $2, $3, $4, CURRENT_DATE)',
+      [userId, restaurantId, atraccion, origen]
     );
 
     res.json({ success: true, message: 'Encuesta registrada exitosamente' });
   } catch (error: any) {
-    if (error.code === '23505') { // Código de PostgreSQL para duplicados
+    if (error.code === '23505') { 
        return res.status(400).json({ success: false, error: 'Ya has respondido esta encuesta.' });
     }
+    console.error("Error guardando encuesta:", error);
     res.status(500).json({ success: false, error: 'Error guardando encuesta' });
   }
 });
