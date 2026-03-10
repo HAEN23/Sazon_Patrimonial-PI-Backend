@@ -1069,21 +1069,24 @@ app.get('/api/restaurants/:id/stats', authenticateToken, async (req: Request, re
       'SELECT COUNT(*) as total_likes FROM favoritos WHERE id_restaurante = $1',
       [id]
     );
-    // Extraemos el número de la base de datos (y lo convertimos a número entero)
     const totalLikes = parseInt(likesQuery.rows[0].total_likes, 10) || 0;
 
-    // 2. (OPCIONAL) Contar las respuestas de la encuesta, si ya tienes esa tabla
-    // const encuestasQuery = await pool.query('SELECT COUNT(*) as total FROM encuestas WHERE id_restaurante = $1', [id]);
-    // const totalEncuestas = parseInt(encuestasQuery.rows[0].total, 10) || 0;
+    // 2. 📥 OBTENER LAS DESCARGAS REALES DEL MENÚ (Leyendo tu contador)
+    // Usamos SUM por si en un futuro el restaurante tiene varios menús
+    const descargasQuery = await pool.query(
+      'SELECT SUM(contador_descargas) as total_descargas FROM menu WHERE id_restaurante = $1',
+      [id]
+    );
+    const totalDescargas = parseInt(descargasQuery.rows[0].total_descargas, 10) || 0;
 
     // 3. Enviamos los datos reales al Frontend para que dibuje la gráfica
     res.json({
       success: true,
       data: {
-        likes: totalLikes, // 👈 ¡Aquí mandamos los likes reales!
-        descargasMenu: 0,  // Puedes cambiar esto después cuando cuentes descargas
-        respuestasEncuesta: 0, // totalEncuestas
-        statsAspectos: [0, 0, 0, 0, 0],
+        likes: totalLikes, 
+        descargasMenu: totalDescargas, // 👈 ¡Cambiamos el 0 por tu variable real!
+        respuestasEncuesta: 0,
+        statsAspectos: [0, 0, 0],
         statsRecomendacion: [0, 0, 0, 0, 0]
       }
     });
