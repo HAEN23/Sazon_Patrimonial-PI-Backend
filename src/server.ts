@@ -1062,24 +1062,35 @@ app.get('/api/restaurants/:id/stats', authenticateToken, async (req: Request, re
       GROUP BY atraccion
     `, [id]);
 
-    let totalEncuestas = 0;
-    const conteoAspectos = { vista: 0, comida: 0, higiene: 0 }; 
+    let totalEncuestasGeneral = 0;
+    const conteo = { comida: 0, ubicacion: 0, recomendacion: 0, horario: 0, vista: 0 }; 
 
     aspectosQuery.rows.forEach(row => {
        const cantidad = parseInt(row.cantidad, 10);
-       totalEncuestas += cantidad;
-       // Agrupamos: 'vista', 'ubicacion', 'horario' cuentan como Ambiente.
-       if(row.atraccion === 'vista' || row.atraccion === 'ubicacion' || row.atraccion === 'horario') conteoAspectos.vista += cantidad; 
-       if(row.atraccion === 'comida') conteoAspectos.comida += cantidad; 
-       if(row.atraccion === 'higiene') conteoAspectos.higiene += cantidad; 
+       totalEncuestasGeneral += cantidad;
+       
+       if(row.atraccion === 'comida') conteo.comida += cantidad; 
+       if(row.atraccion === 'ubicacion') conteo.ubicacion += cantidad; 
+       if(row.atraccion === 'recomendacion') conteo.recomendacion += cantidad; 
+       if(row.atraccion === 'horario') conteo.horario += cantidad; 
+       if(row.atraccion === 'vista') conteo.vista += cantidad; 
     });
 
-    // Calcular porcentajes: [Ambiente, Comida, Higiene]
-    const statsAspectos = [0, 0, 0];
-    if (totalEncuestas > 0) {
-      statsAspectos[0] = Math.round((conteoAspectos.vista / totalEncuestas) * 100);
-      statsAspectos[1] = Math.round((conteoAspectos.comida / totalEncuestas) * 100);
-      statsAspectos[2] = Math.round((conteoAspectos.higiene / totalEncuestas) * 100);
+    const votosAspectos = [conteo.comida, conteo.ubicacion, conteo.recomendacion, conteo.horario, conteo.vista];
+    const statsAspectos = [0, 0, 0, 0, 0];
+
+    if (totalEncuestasGeneral > 0) {
+      statsAspectos[0] = Math.round((conteo.comida / totalEncuestasGeneral) * 100);
+      statsAspectos[1] = Math.round((conteo.ubicacion / totalEncuestasGeneral) * 100);
+      statsAspectos[2] = Math.round((conteo.recomendacion / totalEncuestasGeneral) * 100);
+      statsAspectos[3] = Math.round((conteo.horario / totalEncuestasGeneral) * 100);
+      statsAspectos[4] = Math.round((conteo.vista / totalEncuestasGeneral) * 100);
+      
+      const suma = statsAspectos.reduce((a, b) => a + b, 0);
+      if (suma !== 100 && suma > 0) {
+          const maxIndex = statsAspectos.indexOf(Math.max(...statsAspectos));
+          statsAspectos[maxIndex] += (100 - suma);
+      }
     }
 
     // 3. ENCUESTAS - ORIGEN
@@ -1096,11 +1107,13 @@ app.get('/api/restaurants/:id/stats', authenticateToken, async (req: Request, re
       if(row.origen === 'extranjero') conteoOrigen.extranjero = parseInt(row.cantidad, 10);
     });
 
-    // Calcular porcentajes: [Locales, Extranjeros]
+    const votosOrigen = [conteoOrigen.nacional, conteoOrigen.extranjero];
+    const totalOrigen = conteoOrigen.nacional + conteoOrigen.extranjero;
     const statsOrigen = [0, 0];
-    if (totalEncuestas > 0) {
-       statsOrigen[0] = Math.round((conteoOrigen.nacional / totalEncuestas) * 100);
-       statsOrigen[1] = Math.round((conteoOrigen.extranjero / totalEncuestas) * 100);
+
+    if (totalOrigen > 0) {
+       statsOrigen[0] = Math.round((conteoOrigen.nacional / totalOrigen) * 100);
+       statsOrigen[1] = Math.round((conteoOrigen.extranjero / totalOrigen) * 100);
     }
 
     // 4. RESPUESTA FINAL AL FRONTEND
@@ -1109,9 +1122,11 @@ app.get('/api/restaurants/:id/stats', authenticateToken, async (req: Request, re
       data: {
         likes: totalLikes, 
         descargasMenu: totalDescargas, 
-        respuestasEncuesta: totalEncuestas,
+        respuestasEncuesta: totalEncuestasGeneral,
         statsAspectos: statsAspectos,
-        statsOrigen: statsOrigen, // <-- Para la gráfica de pastel
+        votosAspectos: votosAspectos, // 👈 NUEVO: Mandamos los votos reales
+        statsOrigen: statsOrigen,
+        votosOrigen: votosOrigen,     // 👈 NUEVO: Mandamos los votos reales
         statsRecomendacion: [0, 0, 0, 0, 0] 
       }
     });
