@@ -953,6 +953,23 @@ app.get('/api/favorites/check', authenticateToken, async (req: Request, res: Res
 });
 
 // ============================================
+// DESCARGAS DE MENÚ
+// ============================================
+
+// 📥 RUTA PARA REGISTRAR CADA CLIC AL MENÚ
+app.post('/api/restaurants/:id/menu/click', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    // Guardamos que se acaba de "descargar/ver" el menú de este restaurante
+    await pool.query('INSERT INTO descargas_menu (id_restaurante) VALUES ($1)', [id]);
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Error guardando clic del menú:", error);
+    res.status(500).json({ success: false });
+  }
+});
+
+// ============================================
 // FOTOS DE USUARIOS
 // ============================================
 
