@@ -1176,23 +1176,31 @@ app.post('/api/restaurants/:id/menu/click', async (req: Request, res: Response) 
 // ============================================
 
 // 1. Verificar si el usuario ya respondió (Para bloquear el botón)
+// 🚨 NOTA IMPORTANTE: Solo usamos 'authenticateToken', NO uses 'isClient' ni nada extra aquí.
 app.get('/api/restaurants/:id/survey/check', authenticateToken, async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
     const restaurantId = req.params.id;
 
-    // 🔒 VERIFICAR EL ROL EN LA BASE DE DATOS
+    // Buscamos al usuario en la tabla general
     const usuarioQuery = await pool.query('SELECT id_rol FROM usuario WHERE id_usuario = $1', [userId]);
-    const usuario = usuarioQuery.rows[0];
+    
+    if (usuarioQuery.rows.length === 0) {
+       return res.status(404).json({ success: false, message: "Usuario no encontrado." });
+    }
 
-    // Si es restaurantero, lo rebotamos desde la verificación
-    if (usuario && usuario.id_rol === 2) {
+    const usuario = usuarioQuery.rows[0];
+    const rolNumero = parseInt(usuario.id_rol, 10);
+
+    // Bloqueamos SÓLO a los Restauranteros (Rol 2)
+    if (rolNumero === 2) {
       return res.status(403).json({ 
         success: false, 
         message: "Como Restaurantero, no puedes responder encuestas de satisfacción." 
       });
     }
 
+    // Dejamos pasar al resto (Clientes y Admins) y checamos si ya contestaron
     const checkResult = await pool.query(
       'SELECT id_encuesta FROM encuesta_restaurante WHERE id_usuario = $1 AND id_restaurante = $2',
       [userId, restaurantId]
@@ -1200,7 +1208,8 @@ app.get('/api/restaurants/:id/survey/check', authenticateToken, async (req: Requ
 
     res.json({ success: true, hasAnswered: checkResult.rows.length > 0 });
   } catch (error) {
-    res.status(500).json({ success: false, error: 'Error verificando encuesta' });
+    console.error("Error verificando encuesta:", error);
+    res.status(500).json({ success: false, message: 'Error interno verificando la encuesta' });
   }
 });
 
@@ -1209,13 +1218,20 @@ app.post('/api/restaurants/:id/survey', authenticateToken, async (req: Request, 
   try {
     const userId = (req as any).user.id;
     const restaurantId = req.params.id;
-    const { atraccion, origen } = req.body; // Recibimos las respuestas del frontend
+    const { atraccion, origen } = req.body; 
 
-    // 🔒 1. VERIFICAR EL ROL
+    // Buscamos al usuario
     const usuarioQuery = await pool.query('SELECT id_rol FROM usuario WHERE id_usuario = $1', [userId]);
+    
+    if (usuarioQuery.rows.length === 0) {
+      return res.status(404).json({ success: false, message: "Usuario no encontrado." });
+    }
+    
     const usuario = usuarioQuery.rows[0];
+    const rolNumero = parseInt(usuario.id_rol, 10);
 
-    if (usuario && usuario.id_rol === 2) {
+    // Bloqueamos SÓLO a los Restauranteros
+    if (rolNumero === 2) {
       return res.status(403).json({ success: false, message: "Los restauranteros no pueden responder encuestas." });
     }
 
@@ -1223,7 +1239,7 @@ app.post('/api/restaurants/:id/survey', authenticateToken, async (req: Request, 
        return res.status(400).json({ success: false, message: "Faltan datos de la encuesta." });
     }
 
-    // Guardar la encuesta en la BD con los nuevos campos
+    // Guardar la encuesta
     await pool.query(
       'INSERT INTO encuesta_restaurante (id_usuario, id_restaurante, atraccion, origen, fecha_registro) VALUES ($1, $2, $3, $4, CURRENT_DATE)',
       [userId, restaurantId, atraccion, origen]
