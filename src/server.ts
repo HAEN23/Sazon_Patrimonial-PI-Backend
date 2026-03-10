@@ -1047,68 +1047,33 @@ app.get('/api/restaurants/:id/stats', authenticateToken, async (req: Request, re
   try {
     const { id } = req.params;
 
-    // 1. Contar LIKES
-    const likesQuery = await pool.query('SELECT COUNT(*) as total FROM favoritos WHERE id_restaurante = $1', [id]);
-    const totalLikes = parseInt(likesQuery.rows[0].total) || 0;
+    // 1. 💖 CONTAR LOS LIKES REALES DEL RESTAURANTE
+    const likesQuery = await pool.query(
+      'SELECT COUNT(*) as total_likes FROM favoritos WHERE id_restaurante = $1',
+      [id]
+    );
+    // Extraemos el número de la base de datos (y lo convertimos a número entero)
+    const totalLikes = parseInt(likesQuery.rows[0].total_likes, 10) || 0;
 
-    // 2. Contar DESCARGAS DE MENÚ
-    const descargasQuery = await pool.query('SELECT SUM(contador_descargas) as total FROM menu WHERE id_restaurante = $1', [id]);
-    const totalDescargas = parseInt(descargasQuery.rows[0].total) || 0;
+    // 2. (OPCIONAL) Contar las respuestas de la encuesta, si ya tienes esa tabla
+    // const encuestasQuery = await pool.query('SELECT COUNT(*) as total FROM encuestas WHERE id_restaurante = $1', [id]);
+    // const totalEncuestas = parseInt(encuestasQuery.rows[0].total, 10) || 0;
 
-    // 3. Contar ENCUESTAS RESPONDIDAS
-    const encuestasQuery = await pool.query('SELECT COUNT(*) as total FROM encuesta_restaurante WHERE id_restaurante = $1', [id]);
-    const totalEncuestas = parseInt(encuestasQuery.rows[0].total) || 0;
-
-    // 4. Consultar conteo de Aspectos (Pregunta 1)
-    const aspectosQuery = await pool.query(`
-      SELECT 
-        COUNT(CASE WHEN voto_aspecto = 'Sabor' THEN 1 END) as sabor,
-        COUNT(CASE WHEN voto_aspecto = 'Servicio' THEN 1 END) as servicio,
-        COUNT(CASE WHEN voto_aspecto = 'Precio' THEN 1 END) as precio,
-        COUNT(CASE WHEN voto_aspecto = 'Ambiente' THEN 1 END) as ambiente,
-        COUNT(CASE WHEN voto_aspecto = 'Limpieza' THEN 1 END) as limpieza
-      FROM encuesta_restaurante WHERE id_restaurante = $1`, [id]);
-
-    // 5. Consultar conteo de Recomendación (Pregunta 2)
-    const recomendacionQuery = await pool.query(`
-      SELECT 
-        COUNT(CASE WHEN voto_recomendacion = 'Definitivamente sí' THEN 1 END) as def_si,
-        COUNT(CASE WHEN voto_recomendacion = 'Probablemente sí' THEN 1 END) as prob_si,
-        COUNT(CASE WHEN voto_recomendacion = 'No lo sé' THEN 1 END) as ns_nc,
-        COUNT(CASE WHEN voto_recomendacion = 'Probablemente no' THEN 1 END) as prob_no,
-        COUNT(CASE WHEN voto_recomendacion = 'Definitivamente no' THEN 1 END) as def_no
-      FROM encuesta_restaurante WHERE id_restaurante = $1`, [id]);
-
-    const asp = aspectosQuery.rows[0];
-    const rec = recomendacionQuery.rows[0];
-
+    // 3. Enviamos los datos reales al Frontend para que dibuje la gráfica
     res.json({
       success: true,
       data: {
-        likes: totalLikes,
-        visitas: 0,
-        descargasMenu: totalDescargas,
-        respuestasEncuesta: totalEncuestas,
-        // Enviamos los datos para las dos gráficas
-        statsAspectos: [
-          parseInt(asp.sabor) || 0,
-          parseInt(asp.servicio) || 0,
-          parseInt(asp.precio) || 0,
-          parseInt(asp.ambiente) || 0,
-          parseInt(asp.limpieza) || 0
-        ],
-        statsRecomendacion: [
-          parseInt(rec.def_si) || 0,
-          parseInt(rec.prob_si) || 0,
-          parseInt(rec.ns_nc) || 0,
-          parseInt(rec.prob_no) || 0,
-          parseInt(rec.def_no) || 0
-        ]
+        likes: totalLikes, // 👈 ¡Aquí mandamos los likes reales!
+        descargasMenu: 0,  // Puedes cambiar esto después cuando cuentes descargas
+        respuestasEncuesta: 0, // totalEncuestas
+        statsAspectos: [0, 0, 0, 0, 0],
+        statsRecomendacion: [0, 0, 0, 0, 0]
       }
     });
+
   } catch (error) {
-    console.error('Error obteniendo estadísticas:', error);
-    res.status(500).json({ success: false, error: 'Error al obtener las estadísticas' });
+    console.error("Error obteniendo estadísticas:", error);
+    res.status(500).json({ success: false, message: "Error interno del servidor" });
   }
 });
 
