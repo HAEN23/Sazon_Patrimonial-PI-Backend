@@ -953,23 +953,6 @@ app.get('/api/favorites/check', authenticateToken, async (req: Request, res: Res
 });
 
 // ============================================
-// DESCARGAS DE MENÚ
-// ============================================
-
-// 📥 RUTA PARA REGISTRAR CADA CLIC AL MENÚ
-app.post('/api/restaurants/:id/menu/click', async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    // Guardamos que se acaba de "descargar/ver" el menú de este restaurante
-    await pool.query('INSERT INTO descargas_menu (id_restaurante) VALUES ($1)', [id]);
-    res.json({ success: true });
-  } catch (error) {
-    console.error("Error guardando clic del menú:", error);
-    res.status(500).json({ success: false });
-  }
-});
-
-// ============================================
 // FOTOS DE USUARIOS
 // ============================================
 
@@ -1071,8 +1054,7 @@ app.get('/api/restaurants/:id/stats', authenticateToken, async (req: Request, re
     );
     const totalLikes = parseInt(likesQuery.rows[0].total_likes, 10) || 0;
 
-    // 2. 📥 OBTENER LAS DESCARGAS REALES DEL MENÚ (Leyendo tu contador)
-    // Usamos SUM por si en un futuro el restaurante tiene varios menús
+    // 2. 📥 OBTENER LAS DESCARGAS REALES DEL MENÚ 
     const descargasQuery = await pool.query(
       'SELECT SUM(contador_descargas) as total_descargas FROM menu WHERE id_restaurante = $1',
       [id]
@@ -1084,9 +1066,9 @@ app.get('/api/restaurants/:id/stats', authenticateToken, async (req: Request, re
       success: true,
       data: {
         likes: totalLikes, 
-        descargasMenu: totalDescargas, // 👈 ¡Cambiamos el 0 por tu variable real!
+        descargasMenu: totalDescargas, // 👈 ¡Aquí mandamos las descargas reales!
         respuestasEncuesta: 0,
-        statsAspectos: [0, 0, 0],
+        statsAspectos: [0, 0, 0, 0, 0],
         statsRecomendacion: [0, 0, 0, 0, 0]
       }
     });
