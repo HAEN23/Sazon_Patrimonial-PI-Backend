@@ -1018,6 +1018,28 @@ app.get('/api/photos/restaurant/:id', async (req: Request, res: Response) => {
   }
 });
 
+// 3. Verificar si puede subir fotos (Para validación previa)
+app.get('/api/restaurants/:id/photos/check', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user.id;
+    const usuarioQuery = await pool.query('SELECT id_rol FROM usuario WHERE id_usuario = $1', [userId]);
+    const usuario = usuarioQuery.rows[0];
+
+    // Si es restaurantero, lanzamos el error
+    if (usuario && usuario.id_rol === 2) {
+      return res.status(403).json({ 
+        success: false, 
+        message: "Como Restaurantero, no puedes subir fotos como si fueras cliente." 
+      });
+    }
+
+    // Si es cliente, le damos luz verde
+    res.json({ success: true, message: "Puedes subir fotos." });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Error interno del servidor" });
+  }
+});
+
 // ============================================
 // ESTADÍSTICAS DEL RESTAURANTE
 // ============================================
