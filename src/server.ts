@@ -891,7 +891,7 @@ async function uploadToCloudinary(fileBuffer: Buffer, folder: string, resourceTy
 app.post('/api/favorites/toggle', authenticateToken, async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
-    const { restauranteId } = req.body;
+    const { id_restaurante } = req.body;
 
     // 1. Verificar el rol del usuario desde la base de datos (La fuente de la verdad)
     const usuarioBD = await pool.query('SELECT id_rol FROM usuario WHERE id_usuario = $1', [userId]);
@@ -912,18 +912,18 @@ app.post('/api/favorites/toggle', authenticateToken, async (req: Request, res: R
     // Verificar si ya está en favoritos
     const checkResult = await pool.query(
       'SELECT * FROM favoritos WHERE id_usuario = $1 AND id_restaurante = $2', 
-      [userId, restauranteId]
+      [userId, id_restaurante]
     );
 
     if (checkResult.rows.length > 0) {
       // Si ya es favorito, lo eliminamos
-      await pool.query('DELETE FROM favoritos WHERE id_usuario = $1 AND id_restaurante = $2', [userId, restauranteId]);
+      await pool.query('DELETE FROM favoritos WHERE id_usuario = $1 AND id_restaurante = $2', [userId, id_restaurante]);
       res.json({ success: true, message: 'Removido de favoritos', isFavorite: false });
     } else {
       // ✅ AHORA SÍ: Insertamos el registro incluyendo la fecha actual (CURRENT_DATE)
       await pool.query(
         'INSERT INTO favoritos (id_usuario, id_restaurante, fecha_favorito) VALUES ($1, $2, CURRENT_DATE)', 
-        [userId, restauranteId]
+        [userId, id_restaurante]
       );
       res.json({ success: true, message: 'Agregado a favoritos', isFavorite: true });
     }
@@ -938,11 +938,11 @@ app.post('/api/favorites/toggle', authenticateToken, async (req: Request, res: R
 app.get('/api/favorites/check', authenticateToken, async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
-    const { restauranteId } = req.query;
+    const { id_restaurante } = req.query;
 
     const checkResult = await pool.query(
       'SELECT * FROM favoritos WHERE id_usuario = $1 AND id_restaurante = $2', 
-      [userId, restauranteId]
+      [userId, id_restaurante]
     );
 
     res.json({ success: true, isFavorite: checkResult.rows.length > 0 });
