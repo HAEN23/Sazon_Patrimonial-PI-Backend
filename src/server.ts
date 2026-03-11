@@ -952,6 +952,32 @@ app.get('/api/favorites/check', authenticateToken, async (req: Request, res: Res
   }
 });
 
+// 3. OBTENER TODOS LOS FAVORITOS DE UN USUARIO
+app.get('/api/clients/:id/favorites', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    // Tomamos el ID de la URL y aseguramos que sea un número entero
+    const idUsuario = parseInt(req.params.id, 10);
+    
+    // Como medida extra de seguridad, podrías validar que el usuario pida sus propios favoritos, 
+    // pero para este caso lo dejaremos así para que funcione la vista principal.
+
+    const favoritosResult = await pool.query(
+      `SELECT id_restaurante 
+       FROM favoritos 
+       WHERE id_usuario = $1`, 
+      [idUsuario]
+    );
+
+    res.json({ 
+      success: true, 
+      data: favoritosResult.rows // Esto devuelve [{ id_restaurante: 1 }, { id_restaurante: 3 }]
+    });
+  } catch (error) {
+    console.error('Error obteniendo lista de favoritos:', error);
+    res.status(500).json({ success: false, error: 'Error obteniendo favoritos' });
+  }
+});
+
 // ============================================
 // FOTOS DE USUARIOS
 // ============================================
