@@ -7,13 +7,22 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ---------------------------------------------------------
+// TABLA ADMINISTRADOR
+// Guarda la extensión de los usuarios que tienen el rol Admin
+// ---------------------------------------------------------
 model administrator {
   userId    Int      @id
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
   usuario   usuario  @relation(fields: [userId], references: [id_usuario], onDelete: Cascade)
 }
 
+// ---------------------------------------------------------
+// TABLA APPLICATION (SOLICITUDES)
+// Aquí se guardan TODAS las solicitudes. El filtrado de "No aceptadas
+// o rechazadas" se hace por el campo 'status' (pendiente o en_revision)
+// ---------------------------------------------------------
 model application {
   id                     Int               @id @default(autoincrement())
   proposedRestaurantName String            @db.VarChar(100)
@@ -24,7 +33,7 @@ model application {
   ownerId                Int
   restaurantId           Int?              @unique
   createdAt              DateTime          @default(now())
-  updatedAt              DateTime          @updatedAt @default(now())
+  updatedAt              DateTime          @default(now()) @updatedAt
   restaurant_owner       restaurant_owner  @relation(fields: [ownerId], references: [userId], onDelete: Cascade)
   restaurante            restaurante?      @relation(fields: [restaurantId], references: [id_restaurante])
 
@@ -36,7 +45,7 @@ model client {
   userId    Int      @id
   phone     String?  @db.VarChar(20)
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
   usuario   usuario  @relation(fields: [userId], references: [id_usuario], onDelete: Cascade)
 }
 
@@ -46,7 +55,7 @@ model comprobante {
   ruta_archivo       String             @db.VarChar(500)
   fecha_subida       DateTime           @db.Date
   createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt @default(now())
+  updatedAt          DateTime           @default(now()) @updatedAt
   id_restaurante     Int
   id_solicitud       Int
   id_usuario         Int
@@ -59,18 +68,26 @@ model comprobante {
   @@index([id_usuario])
 }
 
+// ---------------------------------------------------------
+// TABLA DOWNLOAD (ESTADÍSTICAS DEL DASHBOARD)
+// *MEJORA*: Agregué id_restaurante para que sepas exactamente 
+// qué restaurante generó la estadística/descarga.
+// ---------------------------------------------------------
 model download {
   id               Int              @id @default(autoincrement())
   downloadCount    Int              @default(0)
   origin           DownloadOrigin
   opinion          OpinionType
   ownerId          Int
+  id_restaurante   Int? // NUEVO: Relación para saber de qué restaurante es la estadística
   createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt @default(now())
+  updatedAt        DateTime         @default(now()) @updatedAt
   restaurant_owner restaurant_owner @relation(fields: [ownerId], references: [userId], onDelete: Cascade)
+  restaurante      restaurante?     @relation(fields: [id_restaurante], references: [id_restaurante], onDelete: Cascade) // NUEVO
 
   @@index([origin])
   @@index([ownerId])
+  @@index([id_restaurante])
 }
 
 model favoritos {
@@ -79,7 +96,7 @@ model favoritos {
   id_restaurante Int
   fecha_favorito DateTime    @db.Date
   createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt @default(now())
+  updatedAt      DateTime    @default(now()) @updatedAt
   restaurante    restaurante @relation(fields: [id_restaurante], references: [id_restaurante], onDelete: Cascade)
   usuario        usuario     @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade)
 
@@ -95,7 +112,7 @@ model menu {
   id_usuario         Int
   contador_descargas Int         @default(0)
   createdAt          DateTime    @default(now())
-  updatedAt          DateTime    @updatedAt @default(now())
+  updatedAt          DateTime    @default(now()) @updatedAt
   restaurante        restaurante @relation(fields: [id_restaurante], references: [id_restaurante], onDelete: Cascade)
   usuario            usuario     @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade)
 
@@ -106,7 +123,7 @@ model menu {
 model restaurant_owner {
   userId      Int           @id
   createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt @default(now())
+  updatedAt   DateTime      @default(now()) @updatedAt
   application application[]
   download    download[]
   usuario     usuario       @relation(fields: [userId], references: [id_usuario], onDelete: Cascade)
@@ -128,12 +145,13 @@ model restaurante {
   horario_atencion   String?            @db.VarChar(255)
   foto_portada       String?            @db.VarChar(500)
   createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt @default(now())
+  updatedAt          DateTime           @default(now()) @updatedAt
   application        application?
   comprobante        comprobante[]
   favoritos          favoritos[]
   foto_usuario       foto_usuario[]
   menu               menu[]
+  download           download[] // NUEVO: Permite acceder a las descargas desde el restaurante
   solicitud_registro solicitud_registro @relation(fields: [id_solicitud], references: [id_solicitud], onDelete: Cascade)
   usuario            usuario            @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade)
 
@@ -148,7 +166,7 @@ model revision_solicitud {
   id_solicitud       Int
   id_usuario         Int
   createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt @default(now())
+  updatedAt          DateTime           @default(now()) @updatedAt
   solicitud_registro solicitud_registro @relation(fields: [id_solicitud], references: [id_solicitud], onDelete: Cascade)
   usuario            usuario            @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade)
 
@@ -160,7 +178,7 @@ model rol {
   id_rol     Int       @id @default(autoincrement())
   nombre_rol String    @db.VarChar(50)
   createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt @default(now())
+  updatedAt  DateTime  @default(now()) @updatedAt
   usuario    usuario[]
 }
 
@@ -184,7 +202,7 @@ model solicitud_registro {
   foto_2                       String?              @db.VarChar(500)
   foto_3                       String?              @db.VarChar(500)
   createdAt                    DateTime             @default(now())
-  updatedAt                    DateTime             @updatedAt @default(now())
+  updatedAt                    DateTime             @default(now()) @updatedAt
   comprobante                  comprobante[]
   restaurante                  restaurante[]
   revision_solicitud           revision_solicitud[]
@@ -202,7 +220,7 @@ model usuario {
   id_rol             Int
   foto_evidencia     String?              @db.VarChar(500)
   createdAt          DateTime             @default(now())
-  updatedAt          DateTime             @updatedAt @default(now())
+  updatedAt          DateTime             @default(now()) @updatedAt
   administrator      administrator?
   client             client?
   comprobante        comprobante[]
@@ -245,7 +263,7 @@ model foto_usuario {
   id_usuario     Int
   id_restaurante Int
   fecha_subida   DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt @default(now())
+  updatedAt      DateTime    @default(now()) @updatedAt
   restaurante    restaurante @relation(fields: [id_restaurante], references: [id_restaurante], onDelete: Cascade)
   usuario        usuario     @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade)
 
@@ -254,13 +272,13 @@ model foto_usuario {
 }
 
 model encuesta_restaurante {
-  id_encuesta    Int         @id @default(autoincrement())
+  id_encuesta    Int      @id @default(autoincrement())
   id_usuario     Int
   id_restaurante Int
-  atraccion      String?     @db.VarChar(50) 
-  origen         String?     @db.VarChar(50) 
-  fecha_registro DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt @default(now())
+  atraccion      String?  @db.VarChar(50)
+  origen         String?  @db.VarChar(50)
+  fecha_registro DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
 
-  @@unique([id_usuario, id_restaurante]) 
+  @@unique([id_usuario, id_restaurante])
 }
