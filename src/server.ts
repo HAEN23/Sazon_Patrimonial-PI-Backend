@@ -37,7 +37,18 @@ const port = process.env.PORT || 3003;
 // ============================================
 // MIDDLEWARES GLOBALES
 // ============================================
-app.use(cors());
+
+// Configuración de CORS más segura
+app.use(cors({
+  origin: [
+    'http://localhost:3000',                  // Para tus pruebas locales
+    'https://sazon-patrimonial.vercel.app',    // Tu nuevo link oficial
+    'https://sazon-patrimonial-pi-fronted.vercel.app' // El link viejo (por si acaso)
+  ],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+  credentials: true
+}));
+
 app.use(express.json());
 
 // ============================================
