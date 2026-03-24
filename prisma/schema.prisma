@@ -277,6 +277,8 @@ model encuesta_restaurante {
   id_restaurante Int
   atraccion      String?  @db.VarChar(50)
   origen         String?  @db.VarChar(50)
+  platillos      String?  @db.VarChar(100)  // NUEVO
+  mejora         String?  @db.VarChar(100)  // NUEVO
   fecha_registro DateTime @default(now())
   updatedAt      DateTime @default(now()) @updatedAt
 
