@@ -50,7 +50,7 @@ export const submitSurvey = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
     const restaurantId = req.params.id;
-    const { atraccion, origen } = req.body; 
+    const { atraccion, origen, platillos, mejora } = req.body; 
 
     // Buscamos al usuario
     const usuarioQuery = await pool.query('SELECT id_rol FROM usuario WHERE id_usuario = $1', [userId]);
@@ -73,8 +73,8 @@ export const submitSurvey = async (req: Request, res: Response) => {
 
     // Guardar la encuesta
     await pool.query(
-      'INSERT INTO encuesta_restaurante (id_usuario, id_restaurante, atraccion, origen, fecha_registro) VALUES ($1, $2, $3, $4, CURRENT_DATE)',
-      [userId, restaurantId, atraccion, origen]
+      'INSERT INTO encuesta_restaurante (id_usuario, id_restaurante, atraccion, origen, platillos, mejora, fecha_registro) VALUES ($1, $2, $3, $4, $5, $6, CURRENT_DATE)',
+      [userId, restaurantId, atraccion, origen, platillos || null, mejora || null]
     );
 
     res.json({ success: true, message: 'Encuesta registrada exitosamente' });
