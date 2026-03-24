@@ -32,7 +32,8 @@ export const getRestaurantStats = async (req: Request, res: Response) => {
     `, [id]);
 
     let totalEncuestasGeneral = 0;
-    const conteo = { comida: 0, ubicacion: 0, recomendacion: 0, horario: 0, vista: 0 }; 
+    // AGREGAMOS 'limpieza' al objeto de conteo
+    const conteo = { comida: 0, ubicacion: 0, recomendacion: 0, horario: 0, vista: 0, limpieza: 0 }; 
 
     aspectosQuery.rows.forEach(row => {
        const cantidad = parseInt(row.cantidad, 10);
@@ -43,10 +44,15 @@ export const getRestaurantStats = async (req: Request, res: Response) => {
        if(row.atraccion === 'recomendacion') conteo.recomendacion += cantidad; 
        if(row.atraccion === 'horario') conteo.horario += cantidad; 
        if(row.atraccion === 'vista') conteo.vista += cantidad; 
+       // AGREGAMOS la condición para 'limpieza'
+       if(row.atraccion === 'limpieza') conteo.limpieza += cantidad; 
     });
 
-    const votosAspectos = [conteo.comida, conteo.ubicacion, conteo.recomendacion, conteo.horario, conteo.vista];
-    const statsAspectos = [0, 0, 0, 0, 0];
+    // AGREGAMOS conteo.limpieza como el 6to elemento del arreglo
+    const votosAspectos = [conteo.comida, conteo.ubicacion, conteo.recomendacion, conteo.horario, conteo.vista, conteo.limpieza];
+    
+    // CAMBIAMOS a 6 ceros
+    const statsAspectos = [0, 0, 0, 0, 0, 0];
 
     if (totalEncuestasGeneral > 0) {
       statsAspectos[0] = Math.round((conteo.comida / totalEncuestasGeneral) * 100);
@@ -54,6 +60,8 @@ export const getRestaurantStats = async (req: Request, res: Response) => {
       statsAspectos[2] = Math.round((conteo.recomendacion / totalEncuestasGeneral) * 100);
       statsAspectos[3] = Math.round((conteo.horario / totalEncuestasGeneral) * 100);
       statsAspectos[4] = Math.round((conteo.vista / totalEncuestasGeneral) * 100);
+      // CALCULAMOS el porcentaje para el 6to elemento (limpieza)
+      statsAspectos[5] = Math.round((conteo.limpieza / totalEncuestasGeneral) * 100);
       
       // Ajustar para que sume exactamente 100%
       const suma = statsAspectos.reduce((a, b) => a + b, 0);
