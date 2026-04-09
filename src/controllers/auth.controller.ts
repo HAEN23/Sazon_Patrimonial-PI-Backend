@@ -5,6 +5,9 @@ import { pool } from '../config/database';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'tu_secreto_super_seguro';
 
+// 🔥 Expresión Regular para la validación de contraseña segura
+const passwordRegex = /^(?=.*[a-zA-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
+
 export const login = async (req: Request, res: Response) => {
   const { correo, contrasena } = req.body;
   try {
@@ -38,6 +41,11 @@ export const registerGeneral = async (req: Request, res: Response) => {
   try {
     await clientDB.query('BEGIN');
     const { nombre, correo, contrasena, id_rol } = req.body;
+
+    // 🔥 Validación de contraseña segura antes de cualquier otra cosa
+    if (!passwordRegex.test(contrasena)) {
+      throw new Error('La contraseña debe tener mínimo 8 caracteres, incluir letras, números y al menos un carácter especial.');
+    }
 
     const userExists = await clientDB.query('SELECT id_usuario FROM usuario WHERE correo = $1', [correo]);
     if (userExists.rows.length > 0) {
@@ -85,7 +93,7 @@ export const registerGeneral = async (req: Request, res: Response) => {
   } catch (error: any) {
     await clientDB.query('ROLLBACK');
     console.error("❌ Error en el registro general:", error);
-    res.status(500).json({ success: false, error: error.message || 'Error en el servidor' });
+    res.status(400).json({ success: false, error: error.message || 'Error en el servidor' });
   } finally {
     clientDB.release();
   }
@@ -101,6 +109,11 @@ export const registerClient = async (req: Request, res: Response) => {
 
     if (!nombre || !correo || !contrasena) {
       throw new Error('Todos los campos son obligatorios');
+    }
+
+    // 🔥 Validación de contraseña segura antes de buscar en la BD
+    if (!passwordRegex.test(contrasena)) {
+      throw new Error('La contraseña debe tener mínimo 8 caracteres, incluir letras, números y al menos un carácter especial.');
     }
 
     const usuarioExistente = await clientDB.query('SELECT * FROM usuario WHERE correo = $1', [correo]);
