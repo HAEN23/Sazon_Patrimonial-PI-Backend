@@ -1,36 +1,34 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Sazón Patrimonial - Backend
 
-## Getting Started
+Este repositorio contiene la lógica de negocio y la API RESTful que alimenta la plataforma Sazón Patrimonial. Implementa una arquitectura orientada a servicios (SOA) con una separación clara de responsabilidades (Controladores, Rutas, Modelos y Middlewares).
 
-First, run the development server:
+#  Arquitectura y Tecnologías
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+* **Entorno de ejecución:** Node.js con Express.
+* **Lenguaje:** TypeScript.
+* **ORM:** Prisma Client (conectado a la base de datos PostgreSQL).
+* **Seguridad y Autenticación:** JSON Web Tokens (JWT) para el manejo de sesiones seguras y `bcrypt` para el cifrado (hash) de contraseñas.
+* **Infraestructura:** Preparado para despliegue en la nube (Render).
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Especificación de Endpoints Principales (API Spec)
+La API sigue principios REST estándar:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Autenticación y Gestión de Usuarios (/api/auth y /api/client)
+POST /api/auth/login - Autentica a un usuario y devuelve un token JWT.
+POST /api/client/register - Registra un nuevo usuario o restaurantero. Incluye validación estricta de contraseña (mínimo 8 caracteres, alfanumérica y al menos un carácter especial).
+Estadísticas y Análisis (/api/restaurants)
+GET /api/restaurants/:id/stats - Obtiene la agregación en tiempo real de estadísticas del restaurante. Requiere Token.
+POST /api/restaurants/:id/survey - Almacena una nueva respuesta proveniente de la encuesta de comensales.
+POST /api/restaurants/:id/menu/click - Registra e incrementa el contador de descargas del menú.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Pruebas y Aseguramiento de Calidad (QA)
+Pruebas de Carga y Estrés: Se utilizó Apache JMeter simulando un máximo de 5 usuarios concurrentes (para evitar bloqueos en la nube) evaluando tiempos de respuesta de endpoints críticos.
+Pruebas Manuales Funcionales: Validadas mediante colecciones de Postman.
 
-## Learn More
+## Declaración de uso de Inteligencia Artificial y recursos externos
 
-To learn more about Next.js, take a look at the following resources:
+Optimización de consultas SQL/ORM: Apoyo en la formulación de lógicas de agrupación complejas (COUNT, SUM, GROUP BY) en los controladores para extraer y formatear los datos enviados al panel de estadísticas del frontend.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Políticas de Seguridad: Generación de la Expresión Regular (Regex) implementada en los controladores para la validación estricta de contraseñas seguras, previniendo inyecciones o registros débiles.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Toda la arquitectura backend, configuración de Middlewares, diseño del JWT, creación de endpoints y despliegue en Render fue diseñada, comprendida e implementada en su totalidad por el equipo de desarrollo.
