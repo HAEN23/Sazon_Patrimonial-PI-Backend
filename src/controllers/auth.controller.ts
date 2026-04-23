@@ -42,7 +42,7 @@ export const registerGeneral = async (req: Request, res: Response) => {
     await clientDB.query('BEGIN');
     const { nombre, correo, contrasena, id_rol } = req.body;
 
-    // 🔥 Validación de contraseña segura antes de cualquier otra cosa
+    
     if (!passwordRegex.test(contrasena)) {
       throw new Error('La contraseña debe tener mínimo 8 caracteres, incluir letras, números y al menos un carácter especial.');
     }
@@ -111,7 +111,7 @@ export const registerClient = async (req: Request, res: Response) => {
       throw new Error('Todos los campos son obligatorios');
     }
 
-    // 🔥 Validación de contraseña segura antes de buscar en la BD
+    
     if (!passwordRegex.test(contrasena)) {
       throw new Error('La contraseña debe tener mínimo 8 caracteres, incluir letras, números y al menos un carácter especial.');
     }

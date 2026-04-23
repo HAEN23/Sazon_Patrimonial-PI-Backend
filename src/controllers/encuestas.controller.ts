@@ -2,10 +2,7 @@
 import { Request, Response } from 'express';
 import { pool } from '../config/database';
 
-/**
- * Verificar si el usuario ya respondió la encuesta de un restaurante
- * GET /api/restaurants/:id/survey/check
- */
+
 export const checkSurveyStatus = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
@@ -42,10 +39,7 @@ export const checkSurveyStatus = async (req: Request, res: Response) => {
   }
 };
 
-/**
- * Guardar la respuesta de la encuesta
- * POST /api/restaurants/:id/survey
- */
+
 export const submitSurvey = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;

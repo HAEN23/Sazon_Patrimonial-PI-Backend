@@ -3,11 +3,7 @@ import { Request, Response } from 'express';
 import { pool } from '../config/database';
 import { uploadToCloudinary } from '../utils/cloudinary.utils';
 
-/**
- * Subir foto de un restaurante
- * POST /api/photos
- * Requiere: Token de autenticación y haber dado Like al restaurante
- */
+
 export const uploadPhoto = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
@@ -62,10 +58,7 @@ export const uploadPhoto = async (req: Request, res: Response) => {
   }
 };
 
-/**
- * Obtener todas las fotos de un restaurante
- * GET /api/photos/restaurant/:id
- */
+
 export const getRestaurantPhotos = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -80,10 +73,7 @@ export const getRestaurantPhotos = async (req: Request, res: Response) => {
   }
 };
 
-/**
- * Verificar si el usuario puede subir fotos (validación previa)
- * GET /api/restaurants/:id/photos/check
- */
+
 export const checkCanUpload = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
@@ -98,7 +88,7 @@ export const checkCanUpload = async (req: Request, res: Response) => {
       });
     }
 
-    // Si es cliente, le damos luz verde
+    
     res.json({ success: true, message: "Puedes subir fotos." });
   } catch (error) {
     res.status(500).json({ success: false, message: "Error interno del servidor" });

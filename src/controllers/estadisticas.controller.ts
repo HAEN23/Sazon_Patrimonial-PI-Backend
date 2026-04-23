@@ -50,7 +50,7 @@ export const getRestaurantStats = async (req: Request, res: Response) => {
           if(seleccionados.includes('Pozol')) cPlat.pozol++;
        }
 
-       // Mejoras
+       
        if(row.mejora === 'limpieza') cMejora.limpieza++;
        if(row.mejora === 'tiempo') cMejora.tiempo++;
        if(row.mejora === 'comida') cMejora.comida++;
@@ -63,7 +63,7 @@ export const getRestaurantStats = async (req: Request, res: Response) => {
     const votosPlatillos = [cPlat.tostadas, cPlat.garnachas, cPlat.empanadas, cPlat.gorditas, cPlat.pozol];
     const votosMejoras = [cMejora.limpieza, cMejora.tiempo, cMejora.comida, cMejora.etiquetas, cMejora.atencion];
 
-    // Cálculos de porcentajes (igual que tu código original)
+    
     const statsAspectos = [0, 0, 0, 0, 0, 0];
     if (totalEncuestasGeneral > 0) {
       statsAspectos[0] = Math.round((cAtrac.comida / totalEncuestasGeneral) * 100);

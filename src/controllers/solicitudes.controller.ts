@@ -34,10 +34,7 @@ export const getPendingApplications = async (req: Request, res: Response) => {
   }
 };
 
-/**
- * Aprobar solicitud (Admin)
- * PATCH /api/solicitudes/:id/aprobar
- */
+
 export const approveApplication = async (req: Request, res: Response) => {
   const client = await pool.connect();
   try {
@@ -103,10 +100,7 @@ export const approveApplication = async (req: Request, res: Response) => {
   }
 };
 
-/**
- * Rechazar solicitud (Admin)
- * PATCH /api/solicitudes/:id/rechazar
- */
+
 export const rejectApplication = async (req: Request, res: Response) => {
   const client = await pool.connect();
   try {
