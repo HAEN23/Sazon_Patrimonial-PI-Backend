@@ -5,7 +5,7 @@ import { pool } from '../config/database';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'tu_secreto_super_seguro';
 
-// 🔥 Expresión Regular para la validación de contraseña segura
+
 const passwordRegex = /^(?=.*[a-zA-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
 
 export const login = async (req: Request, res: Response) => {
